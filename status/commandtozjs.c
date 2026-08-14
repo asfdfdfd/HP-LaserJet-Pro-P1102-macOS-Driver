@@ -78,9 +78,10 @@ int main(int argc, char **argv)
         ews_conn_t conn = {0};
         if (ews_open(&conn) != 0)
         {
-            fprintf(stderr, "commandtozjs: EWS interface unavailable\n");
+            fprintf(stderr, "ERROR: commandtozjs: EWS interface unavailable\n");
             return 0;   /* no data; CUPS shows unknown levels */
         }
+        fprintf(stderr, "ERROR: commandtozjs: EWS opened ok\n");
 
         unsigned char *raw = NULL;
         size_t len = 0;
@@ -101,6 +102,8 @@ int main(int argc, char **argv)
             free(body);
         }
         free(raw);
+
+        fprintf(stderr, "ERROR: commandtozjs: reportlevels parsed\n");
 
         int lvl = -1;   /* unknown */
         if (level && *level)
