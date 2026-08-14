@@ -21,60 +21,84 @@ The ZjStream encoder is vendored from
 byte-identical to `foo2zjs -z2 -P -L0` for the same bitmap, which is
 verified by the test suite.
 
-## Supported
+## Features
 
 - USB printing (macOS 13+, arm64)
 - 600x600 dpi and FastRes 1200x600 dpi
+- Halftoning: Auto (crisp threshold for text pages, Floyd-Steinberg error
+  diffusion for photos/gradients) or forced Threshold/Diffusion
 - Letter / A4 / A5 / A6 / B5 / Executive / Legal / envelopes / postcard / 16K
 - Media types (envelope, letterhead, transparency, labels, ...)
 - Manual feed, draft mode, print density
-- Halftoning: Auto (crisp threshold for text pages, Floyd-Steinberg
-  error diffusion for photos/gradients) or forced Threshold/Diffusion
 - Two-sided printing (manual duplex): odd pages print, the printer pauses
   for you to flip the paper, then even pages print flipped
 - Multiple copies (printer-side)
-- Printer status, toner level, page counters and estimated pages
-  remaining via `p1102status` (EWS HTTP over USB, the same mechanism
-  HP's own `usbink` uses)
+- Printer status, toner level, page counters and estimated pages remaining
+  via `p1102status` (EWS HTTP over USB, the same mechanism HP's own
+  `usbink` uses)
 - Supply level display in System Settings (CUPS `ReportLevels`/`ReportStatus`
   command filter, like the official HP driver's `commandToHPZJS`)
 - `PrintSelfTestPage` CUPS command: prints a built-in test page
   (resolution stripes, gray blocks, alignment marks)
-- EWS proxy: browse the printer's embedded web server (page counters,
-  config XML) in a browser via `./install.sh --ews`
+- EWS proxy: browse the printer's embedded web server in a browser
 - EconoMode (save toner), Jam Recovery and REt options
 
 Not yet: P1102w over Wi-Fi.
 
-## Install (developer / single machine)
+## Requirements
+
+- macOS 13+
+- Xcode Command Line Tools (`xcode-select --install`)
+- [Meson](https://mesonbuild.com) + [Ninja](https://ninja-build.org):
+  `brew install meson ninja`
+
+## Build and test
 
 ```
-make
-sudo ./install.sh
+meson setup build
+meson compile -C build
+meson test -C build --print-errorlogs
 ```
 
-This installs:
+The test suite verifies byte-identity of the ZjStream output against the
+reference `foo2zjs -z2 -P -L0` engine (after normalizing the PJL
+timestamp), plus self-test and halftone quality checks.
 
-- `/Library/Printers/HP/p1102raster.bundle/Contents/MacOS/rastertozjs`
-- `/Library/Printers/PPDs/Contents/Resources/HP LaserJet Professional P1102.ppd`
-- a printer queue `HP_P1102` on the USB device
-
-Then print:
+## Install
 
 ```
-lp -d HP_P1102 tests/testpage.pdf
-lp -d HP_P1102 -o Duplex=DuplexTumble some-2-page.pdf
+tools/p1102ctl.py setup
 ```
 
-Alternatively add the printer in System Settings → Printers & Scanners and
-pick "HP LaserJet Pro P1102, rastertozjs (open source)".
+This builds, installs the driver to `/Library/Printers` (asks for sudo) and
+registers the printer queue `HP_P1102`. Everything in one command.
+
+### p1102ctl subcommands
+
+| Command | What it does |
+|---|---|
+| `p1102ctl setup` | build + install files + register the queue |
+| `p1102ctl install` | build + install driver files only |
+| `p1102ctl uninstall` | remove driver files |
+| `p1102ctl add-printer` | register the CUPS queue (`lpadmin`) |
+| `p1102ctl remove-printer` | remove the CUPS queue |
+| `p1102ctl status` | printer status, toner, page counters (`--json`) |
+| `p1102ctl ews [path]` | local HTTP proxy to the printer's EWS |
+| `p1102ctl print-test-page` | print the self-test page (via libcups) |
+| `p1102ctl package` | build the release `.pkg` |
+
+Privileged subcommands re-exec themselves via sudo. The CLI is a single
+Python 3 (stdlib-only) file; no bash anywhere.
+
+Alternative to `p1102ctl install`: `sudo meson install -C build` — Meson's
+install rules encode the exact `/Library/Printers` layout (binaries, bundle
+Info.plist, PPD) and run the ad-hoc codesign.
 
 ## Printer status, toner level and EWS
 
 ```
-./install.sh --status          # or: build/p1102status
-./install.sh --status | jq .   # --json output
-./install.sh --ews             # open the printer's EWS in a browser
+p1102ctl status          # or: p1102ctl status --json
+p1102ctl ews             # open the printer's EWS in a browser
 ```
 
 The P1102 does not answer PJL INFO queries, but it exposes a tiny embedded
@@ -88,16 +112,16 @@ name/state/brand/serial, the toner percentage, total page counter,
 cartridge page counter and the estimated pages remaining.
 
 `ewsproxy` is the equivalent of HP's "HtmlConfig": it listens on localhost
-and tunnels HTTP requests to the printer's EWS, so the printer's own pages
-can be opened in a browser. The P1102 firmware only serves the `/DevMgmt/*`
-XML endpoints (no HTML pages).
+and tunnels HTTP requests to the printer's EWS. The P1102 firmware only
+serves the `/DevMgmt/*` XML endpoints (no HTML pages), so the proxy shows a
+small index page with links to them.
 
-The PPD also declares the CUPS commands `ReportLevels` and `ReportStatus`,
-so System Settings → Printers & Scanners shows the toner level for the
-queue (the `commandtozjs` filter answers, same as HP's `commandToHPZJS`).
-Note for driver developers: CUPS feeds the command document to the filter
-as the optional argv[6] file argument (stdin is empty) and parses
-`ATTR:`/`STATE:` lines from the filter's *stderr* (the job status pipe).
+The PPD also declares the CUPS commands `ReportLevels`, `ReportStatus` and
+`PrintSelfTestPage`, so System Settings shows the toner level and a
+self-test page is available. Note for driver developers: CUPS feeds the
+command document to the filter as the optional argv[6] file argument
+(stdin is empty) and parses `ATTR:`/`STATE:` lines from the filter's
+*stderr* (the job status pipe).
 
 ## About the "printer drivers are deprecated" warning
 
@@ -125,30 +149,27 @@ PPD driver model, so this driver keeps working on macOS 13-26 and beyond.
 ## Building a release .pkg
 
 ```
-make
-package/build_pkg.sh
+p1102ctl package
 ```
+
+Produces `HP-LaserJet-Pro-P1102-<version>.pkg` (stages via
+`meson install --destdir`, builds with `pkgbuild`, registers the queue in
+the postinstall script).
 
 ## Layout
 
 ```
-src/rastertozjs.c        CUPS filter: cups-raster -> P4 -> ZjStream
-src/zjs/                 vendored foo2zjs engine (zjs_main) + jbigkit
-ppd/                     PPD for macOS
-tests/                   unit tests + test helpers
-status/                  toner status tool (WIP)
-package/                 pkgbuild scripts
+meson.build               build system (targets, install rules, tests)
+src/rastertozjs.c         CUPS filter: cups-raster -> P4 -> ZjStream
+src/p1102cmd.c            libcups helper: submit CUPS commands (test page)
+src/zjs/                  vendored foo2zjs engine (zjs_main) + jbigkit
+status/                   p1102status, commandtozjs, ewsproxy + ews.c
+bundle/Info.plist         driver bundle metadata
+ppd/                      PPD for macOS
+tools/p1102ctl.py         CLI (setup/install/status/ews/...)
+tools/codesign.py         ad-hoc codesign at 'meson install'
+tests/                    fixtures, check runners (meson test)
 ```
-
-## Testing
-
-```
-make test
-```
-
-The test suite generates CUPS raster input from known PBM fixtures, runs the
-filter, and compares the ZjStream output byte-for-byte (after normalizing the
-PJL timestamp) against the reference `foo2zjs -z2 -P -L0` binary.
 
 ## Credits
 

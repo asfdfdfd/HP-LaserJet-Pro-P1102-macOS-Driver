@@ -4,9 +4,12 @@ on:
   push:
     paths:
       - 'src/**'
-      - 'tests/**'
       - 'status/**'
-      - 'Makefile'
+      - 'tests/**'
+      - 'tools/**'
+      - 'bundle/**'
+      - 'ppd/**'
+      - 'meson.build'
   pull_request:
   workflow_dispatch:
 
@@ -18,16 +21,24 @@ jobs:
       - name: Git checkout
         uses: actions/checkout@v4
 
-      - name: Build
-        run: make
+      - name: Install meson and ninja
+        run: brew install meson ninja
 
-      - name: Run byte-identity test suite
-        run: make test
+      - name: Setup
+        run: meson setup build
+
+      - name: Build
+        run: meson compile -C build
+
+      - name: Test
+        run: meson test -C build --print-errorlogs
+
+      - name: Check CLI syntax
+        run: python3 -m py_compile tools/p1102ctl.py tools/codesign.py
 
       - name: Verify PPD
         run: |
           cp ppd/HP-LaserJet-Pro-P1102.ppd /tmp/test.ppd
-          # replace the install path with a dummy for validation
           sed -i '' 's|/Library/Printers/HP/p1102raster.bundle/Contents/MacOS/rastertozjs|/usr/bin/true|' /tmp/test.ppd
           sed -i '' 's|/Library/Printers/HP/p1102raster.bundle/Contents/MacOS/commandtozjs|/usr/bin/true|' /tmp/test.ppd
           cupstestppd /tmp/test.ppd || true
