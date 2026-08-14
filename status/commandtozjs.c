@@ -53,12 +53,16 @@ int main(int argc, char **argv)
     (void)argv;
 
     {
-        /* Diagnostics: record that we ran and where (CUPS sandbox test). */
+        /* Diagnostics (CUPS sandbox test). */
+        fprintf(stderr, "ERROR: commandtozjs started pid=%d cwd=%s\n",
+                (int)getpid(), getenv("TMPDIR") ? getenv("TMPDIR") : "?");
         const char *td = getenv("TMPDIR");
         char path[512];
         snprintf(path, sizeof(path), "%s/commandtozjs-ran", td ? td : "/tmp");
         FILE *m = fopen(path, "w");
         if (m) { fprintf(m, "pid=%d\n", (int)getpid()); fclose(m); }
+        else
+            fprintf(stderr, "ERROR: commandtozjs marker write failed\n");
     }
 
     char *cmd = read_command();
