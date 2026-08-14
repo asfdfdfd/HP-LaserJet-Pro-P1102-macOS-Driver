@@ -72,6 +72,23 @@ open(sys.argv[1] + "/gray_thr.pbm", "wb").write(out)
 $TMP/mkraster -g < "$TMP/gray.pgm" > "$TMP/gray.raster"
 check "gray"        gray_thr.pbm  gray.raster      "-g" "-z2 -P -L0 -r600x600 -g5100x6600 -p1 -m1 -s7 -n1" prebuilt
 
+# K 8bpp (the colorspace cgpdftoraster actually produces): PGM is stored
+# inverted (0=white, 255=black), expected bitmap = same gray_thr.pbm.
+python3 -c '
+import sys
+src = open(sys.argv[1] + "/gray.pgm", "rb").read()
+import re
+m = re.match(rb"P5\s+(\d+)\s+(\d+)\s+\d+\s*\n", src)
+w, h = int(m.group(1)), int(m.group(2))
+data = src[m.end():]
+out = bytearray(b"P5\n%d %d\n255\n" % (w, h))
+for y in range(h):
+    out += bytes(255 - b for b in data[y*w:(y+1)*w])
+open(sys.argv[1] + "/gray_K.pgm", "wb").write(out)
+' "$TMP"
+$TMP/mkraster -K < "$TMP/gray_K.pgm" > "$TMP/grayK.raster"
+check "grayK"       gray_thr.pbm  grayK.raster     "-K" "-z2 -P -L0 -r600x600 -g5100x6600 -p1 -m1 -s7 -n1" prebuilt
+
 echo
 echo "PASS: $pass  FAIL: $fail"
 [ $fail -eq 0 ]

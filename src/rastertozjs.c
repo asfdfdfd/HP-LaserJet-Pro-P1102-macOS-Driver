@@ -96,19 +96,19 @@ static void convert_row(const unsigned char *line, unsigned char *pbmrow,
 
     switch (cs)
     {
-        case CUPS_CSPACE_K:      /* 1 = black */
+        case CUPS_CSPACE_K:      /* K: 1/255 = black, 0 = white */
             if (bpc == 1)
             {
                 memcpy(pbmrow, line, bpl);
                 return;
             }
-            /* 8-bit K: threshold */
+            /* 8-bit K: threshold (255 = black) */
             for (x = 0; x < w; ++x)
-                if (line[x] < 128)
+                if (line[x] >= 128)
                     pbmrow[x / 8] |= 0x80 >> (x & 7);
             return;
 
-        case CUPS_CSPACE_W:      /* 1 = white */
+        case CUPS_CSPACE_W:      /* W: 1/255 = white, 0 = black */
         case CUPS_CSPACE_SW:
             if (bpc == 1)
             {

@@ -16,6 +16,7 @@ int main(int argc, char **argv)
     int resx = 600, resy = 600;
     float pw = 612, ph = 792;
     int gray = 0;
+    int kmode = 0;   /* -K: read P5 where 0=white,255=black, write K 8bpp */
     int i;
     FILE *in = stdin;
     cups_page_header2_t hdr;
@@ -38,6 +39,8 @@ int main(int argc, char **argv)
         }
         else if (strcmp(argv[i], "-g") == 0)
             gray = 1;
+        else if (strcmp(argv[i], "-K") == 0)
+            kmode = 1;
         else
         {
             in = fopen(argv[i], "rb");
@@ -46,7 +49,7 @@ int main(int argc, char **argv)
     }
 
     if (fgets(line, sizeof(line), in) == NULL ||
-            strncmp(line, gray ? "P5" : "P4", 2) != 0)
+            strncmp(line, (gray || kmode) ? "P5" : "P4", 2) != 0)
         die("not a P4/P5 pbm stream");
     do { if (fgets(line, sizeof(line), in) == NULL) die("eof in header"); }
     while (line[0] == '#');
@@ -58,12 +61,12 @@ int main(int argc, char **argv)
         h = (unsigned)atoi(sp);
         if (fgets(line, sizeof(line), in) == NULL) die("eof after dims");
     }
-    if (gray)
+    if (gray || kmode)
     {
         if (fgets(line, sizeof(line), in) == NULL) die("eof in maxval");
     }
 
-    bpl = gray ? w : (w + 7) / 8;
+    bpl = gray || kmode ? w : (w + 7) / 8;
 
     memset(&hdr, 0, sizeof(hdr));
     strncpy(hdr.MediaClass, "PwgRaster", sizeof(hdr.MediaClass) - 1);
@@ -73,11 +76,11 @@ int main(int argc, char **argv)
     hdr.PageSize[1] = (unsigned)ph;
     hdr.cupsWidth = w;
     hdr.cupsHeight = h;
-    hdr.cupsBitsPerColor = gray ? 8 : 1;
-    hdr.cupsBitsPerPixel = gray ? 8 : 1;
+    hdr.cupsBitsPerColor = (gray || kmode) ? 8 : 1;
+    hdr.cupsBitsPerPixel = (gray || kmode) ? 8 : 1;
     hdr.cupsBytesPerLine = bpl;
     hdr.cupsColorOrder = CUPS_ORDER_CHUNKED;
-    hdr.cupsColorSpace = gray ? CUPS_CSPACE_W : CUPS_CSPACE_K;
+    hdr.cupsColorSpace = kmode ? CUPS_CSPACE_K : (gray ? CUPS_CSPACE_W : CUPS_CSPACE_K);
     hdr.cupsNumColors = 1;
     hdr.cupsPageSize[0] = pw;
     hdr.cupsPageSize[1] = ph;
@@ -114,7 +117,7 @@ int main(int argc, char **argv)
             char *got = fgets(line, sizeof(line), in);
             int again = 0;
 
-            if (got && strncmp(line, gray ? "P5" : "P4", 2) == 0)
+            if (got && strncmp(line, (gray || kmode) ? "P5" : "P4", 2) == 0)
             {
                 do { if (fgets(line, sizeof(line), in) == NULL) break; }
                 while (line[0] == '#');
@@ -124,7 +127,7 @@ int main(int argc, char **argv)
                     {
                         if (fgets(line, sizeof(line), in) == NULL) break;
                     }
-                    bpl = gray ? w : (w + 7) / 8;
+                    bpl = gray || kmode ? w : (w + 7) / 8;
                     hdr.cupsWidth = w;
                     hdr.cupsHeight = h;
                     hdr.cupsBytesPerLine = bpl;
