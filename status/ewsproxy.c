@@ -25,6 +25,27 @@
 
 static pthread_mutex_t ews_mutex = PTHREAD_MUTEX_INITIALIZER;
 
+static const char *index_html =
+    "<!DOCTYPE html><html><head><meta charset=utf-8>"
+    "<title>HP LaserJet Professional P1102</title></head><body>"
+    "<h1>HP LaserJet Professional P1102 (EWS over USB)</h1>"
+    "<p>The P1102 firmware does not serve HTML pages, only these "
+    "XML endpoints:</p><ul>"
+    "<li><a href='/DevMgmt/ProductConfigDyn.xml'>Device configuration</a></li>"
+    "<li><a href='/DevMgmt/ProductStatusDyn.xml'>Device status</a></li>"
+    "<li><a href='/DevMgmt/ConsumableConfigDyn.xml'>Consumable / toner</a></li>"
+    "<li><a href='/DevMgmt/ProductUsageDyn.xml'>Usage counters</a></li>"
+    "</ul></body></html>";
+
+static int is_local_index(const char *req)
+{
+    /* GET / , GET /SSI/index.htm -> serve the local index page */
+    return strncmp(req, "GET / ", 6) == 0 ||
+           strncmp(req, "GET /SSI/index.htm", 18) == 0 ||
+           strncmp(req, "GET /index.htm", 14) == 0 ||
+           strncmp(req, "GET /HTTP/", 10) == 0;
+}
+
 static void handle_client(int fd)
 {
     unsigned char *req = malloc(MAX_REQ);
@@ -61,7 +82,16 @@ static void handle_client(int fd)
         }
     }
 
-    if (len > 0)
+    if (len > 0 && is_local_index((const char *)req))
+    {
+        char buf[1024];
+        int n = snprintf(buf, sizeof(buf),
+            "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\n"
+            "Content-Length: %zu\r\nConnection: close\r\n\r\n%s",
+            strlen(index_html), index_html);
+        write(fd, buf, (size_t)n);
+    }
+    else if (len > 0)
     {
         pthread_mutex_lock(&ews_mutex);
         unsigned char *resp = NULL;
@@ -99,9 +129,7 @@ static void *client_thread(void *arg)
 
 int main(int argc, char **argv)
 {
-    const char *path = argc > 1 ? argv[1] : "/SSI/index.htm";
-    if (path[0] != '/')
-        path = "/SSI/index.htm";
+    const char *path = argc > 1 ? argv[1] : "/";
 
     int srv = socket(AF_INET, SOCK_STREAM, 0);
     if (srv < 0) { perror("socket"); return 1; }
