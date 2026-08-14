@@ -6,10 +6,11 @@ LDFLAGS  = -isysroot $(SDK) -lcupsimage -lcups -lpthread
 
 BIN      = build/rastertozjs
 OBJS     = build/rastertozjs.o build/foo2zjs.o build/jbig.o build/jbig_ar.o
+STATUS   = build/p1102status
 
 VENDOR   = src/zjs/vendor
 
-all: $(BIN)
+all: $(BIN) $(STATUS)
 
 build:
 	mkdir -p build
@@ -28,6 +29,14 @@ build/jbig_ar.o: $(VENDOR)/jbig_ar.c $(VENDOR)/jbig_ar.h | build
 
 $(BIN): $(OBJS)
 	$(CC) $(CFLAGS) -o $@ $(OBJS) $(LDFLAGS)
+
+$(STATUS): status/p1102status.c | build
+	$(CC) $(CFLAGS) -Wno-unused-result -o $@ status/p1102status.c \
+	    -framework IOKit -framework CoreFoundation
+
+build/usbprobe: status/usbprobe.c | build
+	$(CC) $(CFLAGS) -o $@ status/usbprobe.c \
+	    -framework IOKit -framework CoreFoundation
 
 test: all
 	./tests/run_tests.sh

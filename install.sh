@@ -76,6 +76,11 @@ EOF
     chmod 555 "$BIN_DIR/rastertozjs"
     codesign --force -s - "$BIN_DIR/rastertozjs" >/dev/null 2>&1 || true
 
+    echo "==> Installing status tool..."
+    cp build/p1102status "$BIN_DIR/p1102status"
+    chmod 555 "$BIN_DIR/p1102status"
+    codesign --force -s - "$BIN_DIR/p1102status" >/dev/null 2>&1 || true
+
     echo "==> Installing PPD..."
     mkdir -p "$PPD_DIR"
     cp "$PPD_SRC" "$PPD_DST"
@@ -161,12 +166,19 @@ case "${1:-install}" in
     --print-test)
         do_print_test
         ;;
+    --status)
+        if [ "$(id -u)" = "0" ]; then
+            echo "Run without sudo: $0 --status"
+            exit 1
+        fi
+        "$BIN_DIR/p1102status"
+        ;;
     --uninstall)
         need_root "$@"
         do_uninstall
         ;;
     *)
-        echo "Usage: $0 [install|--print-test|--uninstall]"
+        echo "Usage: $0 [install|--print-test|--status|--uninstall]"
         exit 1
         ;;
 esac

@@ -29,8 +29,10 @@ verified by the test suite.
 - Media types (envelope, letterhead, transparency, labels, ...)
 - Manual feed, draft mode, print density
 - Multiple copies (printer-side)
+- Printer status + toner level via `p1102status` (EWS HTTP over USB,
+  the same mechanism HP's own `usbink` uses)
 
-Not yet: toner status display (see `status/`), P1102w over Wi-Fi.
+Not yet: P1102w over Wi-Fi.
 
 ## Install (developer / single machine)
 
@@ -53,6 +55,22 @@ lp -d HP_P1102 tests/testpage.pdf
 
 Alternatively add the printer in System Settings → Printers & Scanners and
 pick "HP LaserJet Pro P1102, rastertozjs (open source)".
+
+## Printer status and toner level
+
+```
+./install.sh --status          # or: build/p1102status
+./install.sh --status | jq .   # --json output
+```
+
+The P1102 does not answer PJL INFO queries, but it exposes a tiny embedded
+web server on a vendor-specific USB interface (class FF/02/10) that speaks
+plain HTTP over the bulk endpoints. `p1102status` fetches
+`/DevMgmt/ProductStatusDyn.xml` and `/DevMgmt/ConsumableConfigDyn.xml` over
+that channel — the same mechanism HP's own `usbink` utility uses (this is
+also the transport hplip calls the "Marvell EWS" channel). It reports the
+printer state (e.g. `inPowerSave`), the supply name/state/brand/serial and
+the toner percentage when the cartridge reports it.
 
 ## About the "printer drivers are deprecated" warning
 
