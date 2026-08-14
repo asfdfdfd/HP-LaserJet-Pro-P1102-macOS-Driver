@@ -7,7 +7,9 @@
  *
  * The command text (#CUPS-COMMAND\nReportLevels) arrives on stdin; we query
  * the printer's EWS-over-USB interface and answer with ATTR:/STATE: lines
- * on stdout, which the CUPS scheduler parses.
+ * on STDERR - the CUPS scheduler reads the job's status pipe (the stderr
+ * of filters/backend) and parses ATTR:/STATE: from there.  stdout must stay
+ * empty: it is forwarded to the backend and written to the printer.
  *
  * GPL-2.0
  */
@@ -17,7 +19,7 @@
 #include <ctype.h>
 #include "ews.h"
 
-#define SUPPLY_LOW 10     /* below this % report marker-supply-low-report */
+#define SUPPLY_LOW 20     /* below this % report marker-supply-low-report */
 
 static char *read_command(void)
 {
@@ -49,6 +51,15 @@ int main(int argc, char **argv)
 {
     (void)argc;
     (void)argv;
+
+    {
+        /* Diagnostics: record that we ran and where (CUPS sandbox test). */
+        const char *td = getenv("TMPDIR");
+        char path[512];
+        snprintf(path, sizeof(path), "%s/commandtozjs-ran", td ? td : "/tmp");
+        FILE *m = fopen(path, "w");
+        if (m) { fprintf(m, "pid=%d\n", (int)getpid()); fclose(m); }
+    }
 
     char *cmd = read_command();
     if (!cmd)
@@ -92,14 +103,14 @@ int main(int argc, char **argv)
             lvl = atoi(level);
         free(level);
 
-        printf("ATTR: marker-colors=#000000 marker-levels=%d "
-               "marker-names=Black marker-types=toner\n", lvl);
+        fprintf(stderr, "ATTR: marker-colors=#000000 marker-levels=%d "
+                "marker-names=Black marker-types=toner\n", lvl);
         if (lvl >= 0 && lvl < SUPPLY_LOW)
-            printf("STATE: +marker-supply-low-report\n");
+            fprintf(stderr, "STATE: +marker-supply-low-report\n");
         else
-            printf("STATE: -marker-supply-low-report\n");
+            fprintf(stderr, "STATE: -marker-supply-low-report\n");
         if (cstate)
-            printf("STATE: %s\n", cstate);
+            fprintf(stderr, "STATE: %s\n", cstate);
         free(cstate);
     }
     else if (has_command(cmd, "reportstatus"))
@@ -107,7 +118,7 @@ int main(int argc, char **argv)
         ews_conn_t conn = {0};
         if (ews_open(&conn) != 0)
         {
-            printf("STATE: offline\n");
+            fprintf(stderr, "STATE: offline\n");
             return 0;
         }
         unsigned char *raw = NULL;
@@ -124,7 +135,7 @@ int main(int argc, char **argv)
             free(body);
         }
         free(raw);
-        printf("STATE: %s\n", status ? status : "idle");
+        fprintf(stderr, "STATE: %s\n", status ? status : "idle");
         free(status);
     }
 
