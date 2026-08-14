@@ -54,6 +54,29 @@ lp -d HP_P1102 tests/testpage.pdf
 Alternatively add the printer in System Settings → Printers & Scanners and
 pick "HP LaserJet Pro P1102, rastertozjs (open source)".
 
+## About the "printer drivers are deprecated" warning
+
+`lpadmin` may print a warning like:
+
+```
+lpadmin: printer drivers are deprecated and will stop working in a future version of CUPS
+```
+
+This is expected and harmless. CUPS 2.4+ deprecates the classic driver model
+(PPD + a binary CUPS filter) in favor of *driverless IPP*, where the printer
+itself describes its capabilities over IPP. This warning appears for **every**
+queue created with a PPD-based driver, including the official HP, Epson and
+Brother drivers — it is not specific to this project.
+
+The queue still works normally (the warning is informational, printed only by
+`lpadmin`, and macOS itself does not show it in System Settings).
+
+For the P1102 there is no driverless alternative: IPP-USB requires IPP support
+inside the printer, and the P1102 only speaks the proprietary ZjStream
+language. A host-side IPP proxy would be the only "future-proof" approach,
+which is a much larger project. Apple's CUPS fork still fully supports the
+PPD driver model, so this driver keeps working on macOS 13-26 and beyond.
+
 ## Building a release .pkg
 
 ```
