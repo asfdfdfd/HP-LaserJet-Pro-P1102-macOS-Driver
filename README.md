@@ -31,8 +31,14 @@ verified by the test suite.
 - Two-sided printing (manual duplex): odd pages print, the printer pauses
   for you to flip the paper, then even pages print flipped
 - Multiple copies (printer-side)
-- Printer status + toner level via `p1102status` (EWS HTTP over USB,
-  the same mechanism HP's own `usbink` uses)
+- Printer status, toner level, page counters and estimated pages
+  remaining via `p1102status` (EWS HTTP over USB, the same mechanism
+  HP's own `usbink` uses)
+- Supply level display in System Settings (CUPS `ReportLevels` command
+  filter, like the official HP driver's `commandToHPZJS`)
+- EWS proxy: browse the printer's embedded web server (page counters,
+  config XML) in a browser via `./install.sh --ews`
+- EconoMode (save toner), Jam Recovery and REt options
 
 Not yet: P1102w over Wi-Fi.
 
@@ -59,21 +65,32 @@ lp -d HP_P1102 -o Duplex=DuplexTumble some-2-page.pdf
 Alternatively add the printer in System Settings → Printers & Scanners and
 pick "HP LaserJet Pro P1102, rastertozjs (open source)".
 
-## Printer status and toner level
+## Printer status, toner level and EWS
 
 ```
 ./install.sh --status          # or: build/p1102status
 ./install.sh --status | jq .   # --json output
+./install.sh --ews             # open the printer's EWS in a browser
 ```
 
 The P1102 does not answer PJL INFO queries, but it exposes a tiny embedded
 web server on a vendor-specific USB interface (class FF/02/10) that speaks
-plain HTTP over the bulk endpoints. `p1102status` fetches
-`/DevMgmt/ProductStatusDyn.xml` and `/DevMgmt/ConsumableConfigDyn.xml` over
-that channel — the same mechanism HP's own `usbink` utility uses (this is
-also the transport hplip calls the "Marvell EWS" channel). It reports the
-printer state (e.g. `inPowerSave`), the supply name/state/brand/serial and
-the toner percentage when the cartridge reports it.
+plain HTTP over the bulk endpoints (the transport hplip calls the "Marvell
+EWS" channel and the one HP's own `usbink` utility uses). `p1102status`
+fetches `/DevMgmt/ProductStatusDyn.xml`,
+`/DevMgmt/ConsumableConfigDyn.xml` and `/DevMgmt/ProductUsageDyn.xml` over
+that channel and reports the printer state (e.g. `inPowerSave`), the supply
+name/state/brand/serial, the toner percentage, total page counter,
+cartridge page counter and the estimated pages remaining.
+
+`ewsproxy` is the equivalent of HP's "HtmlConfig": it listens on localhost
+and tunnels HTTP requests to the printer's EWS, so the printer's own pages
+can be opened in a browser. The P1102 firmware only serves the `/DevMgmt/*`
+XML endpoints (no HTML pages).
+
+The PPD also declares the CUPS commands `ReportLevels` and `ReportStatus`,
+so System Settings → Printers & Scanners shows the toner level for the
+queue (the `commandtozjs` filter answers, same as HP's `commandToHPZJS`).
 
 ## About the "printer drivers are deprecated" warning
 

@@ -23,7 +23,7 @@ PPD_DIR="$ROOT/Library/Printers/PPDs/Contents/Resources"
 echo "==> staging payload..."
 mkdir -p "$BIN_DIR" "$PPD_DIR"
 cp build/rastertozjs "$BIN_DIR/"
-cp build/p1102status "$BIN_DIR/"
+cp build/p1102status build/commandtozjs build/ewsproxy "$BIN_DIR/"
 cp ppd/HP-LaserJet-Pro-P1102.ppd "$PPD_DIR/HP LaserJet Professional P1102.ppd"
 
 cat > "$ROOT/Library/Printers/HP/p1102raster.bundle/Contents/Info.plist" <<'EOF'
@@ -67,8 +67,9 @@ chmod 644 "$BIN_DIR/../Info.plist" \
     "$PPD_DIR/HP LaserJet Professional P1102.ppd"
 
 echo "==> signing (ad-hoc)..."
-codesign --force -s - "$BIN_DIR/rastertozjs"
-codesign --force -s - "$BIN_DIR/p1102status"
+for t in rastertozjs p1102status commandtozjs ewsproxy; do
+    codesign --force -s - "$BIN_DIR/$t"
+done
 
 echo "==> writing postinstall script..."
 cat > "$SCRIPTS/postinstall" <<'EOF'

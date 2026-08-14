@@ -26,7 +26,9 @@
 *cupsVersion: 2.4
 *cupsModelNumber: 2
 *cupsManualCopies: True
+*cupsCommands: "ReportLevels ReportStatus"
 *cupsFilter: "application/vnd.cups-raster 100 /Library/Printers/HP/p1102raster.bundle/Contents/MacOS/rastertozjs"
+*cupsFilter: "application/vnd.cups-command 100 /Library/Printers/HP/p1102raster.bundle/Contents/MacOS/commandtozjs"
 *1284DeviceID: "MFG:Hewlett-Packard;MDL:HP LaserJet Professional P1102;CMD:ZJS,PJL,ACL,HTTP;DES:HP LaserJet Professional P1102;DRV:P1102rastertozjs;"
 *OpenUI *PageSize/Media Size: PickOne
 *OrderDependency: 10 AnySetup *PageSize
@@ -138,6 +140,24 @@
 *MediaType Transparency/Transparency: "<< /cupsMediaType 2 >> setpagedevice"
 *MediaType Vellum/Vellum: "<< /cupsMediaType 273 >> setpagedevice"
 *CloseUI: *MediaType
+*OpenUI *EconoMode/Economode (Save Toner): Boolean
+*OrderDependency: 20 AnySetup *EconoMode
+*DefaultEconoMode: False
+*EconoMode False/Off: ""
+*EconoMode True/On: ""
+*CloseUI: *EconoMode
+*OpenUI *JamRecovery/Jam Recovery: Boolean
+*OrderDependency: 20 AnySetup *JamRecovery
+*DefaultJamRecovery: False
+*JamRecovery False/Off: ""
+*JamRecovery True/On: ""
+*CloseUI: *JamRecovery
+*OpenUI *REt/REt (Resolution Enhancement): Boolean
+*OrderDependency: 20 AnySetup *REt
+*DefaultREt: True
+*REt False/Off: ""
+*REt True/On: ""
+*CloseUI: *REt
 *OpenUI *Quality/Print Quality: PickOne
 *OrderDependency: 10 AnySetup *Quality
 *DefaultQuality: Normal

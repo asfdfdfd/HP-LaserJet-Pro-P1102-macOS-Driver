@@ -35,6 +35,9 @@ typedef struct {
     int  draft;               /* Quality=draft */
     int  density;             /* 0 = not set */
     int  duplex;              /* 0=off, 4=manual long edge, 5=manual short edge */
+    int  econo;               /* EconoMode (save toner) */
+    int  jamrecovery;         /* JamRecovery PJL */
+    int  ret;                 /* REt (resolution enhancement), default on */
     int  copies;
 } job_opts_t;
 
@@ -403,6 +406,9 @@ static void parse_options(const char *options, job_opts_t *opts)
     opts->draft = 0;
     opts->density = 0;
     opts->duplex = 0;
+    opts->econo = 0;
+    opts->jamrecovery = 0;
+    opts->ret = 1;
     opts->copies = 1;
 
     if (!options || !*options)
@@ -432,6 +438,15 @@ static void parse_options(const char *options, job_opts_t *opts)
             else
                 opts->duplex = 0;
         }
+        else if (strcasecmp(tok, "EconoMode") == 0)
+            opts->econo = (strcasecmp(eq + 1, "True") == 0 ||
+                           strcasecmp(eq + 1, "On") == 0);
+        else if (strcasecmp(tok, "JamRecovery") == 0)
+            opts->jamrecovery = (strcasecmp(eq + 1, "True") == 0 ||
+                                 strcasecmp(eq + 1, "On") == 0);
+        else if (strcasecmp(tok, "REt") == 0)
+            opts->ret = !(strcasecmp(eq + 1, "False") == 0 ||
+                          strcasecmp(eq + 1, "Off") == 0);
         else if (strcasecmp(tok, "Quality") == 0)
             opts->draft = (strcasecmp(eq + 1, "draft") == 0);
         else if (strcasecmp(tok, "Density") == 0)
@@ -548,6 +563,10 @@ int main(int argc, char **argv)
     in = fdopen(pipefd[0], "r");
     if (!in)
         return 1;
+
+    /* PJL tweaks for the vendored engine. */
+    setenv("ZJS_JAMRECOVERY", opts.jamrecovery ? "ON" : "OFF", 1);
+    setenv("ZJS_RET", opts.ret ? "MEDIUM" : "OFF", 1);
 
     /* The vendored engine writes the full ZjStream document to stdout. */
     rc = zjs_main(zargc, zargv, in);

@@ -832,10 +832,20 @@ start_doc(FILE *fp)
 	strftime(datetime, sizeof(datetime), "%Y%m%d%H%M%S", tmp);
 
 	fprintf(fp, "\033%%-12345X@PJL JOB\n");
-	fprintf(fp, "@PJL SET JAMRECOVERY=OFF\n");
-	fprintf(fp, "@PJL SET DENSITY=%d\n", PrintDensity);
-	fprintf(fp, "@PJL SET ECONOMODE=%s\n", EconoMode ? "ON" : "OFF");
-	fprintf(fp, "@PJL SET RET=MEDIUM\n");
+	{
+	    const char *ev;
+
+	    /* PJL tweaks, overridable via environment (used by the
+	     * rastertozjs CUPS filter). */
+	    ev = getenv("ZJS_JAMRECOVERY");
+	    fprintf(fp, "@PJL SET JAMRECOVERY=%s\n",
+		    ev && !strcmp(ev, "ON") ? "ON" : "OFF");
+	    fprintf(fp, "@PJL SET DENSITY=%d\n", PrintDensity);
+	    fprintf(fp, "@PJL SET ECONOMODE=%s\n", EconoMode ? "ON" : "OFF");
+	    ev = getenv("ZJS_RET");
+	    fprintf(fp, "@PJL SET RET=%s\n",
+		    ev && !strcmp(ev, "OFF") ? "OFF" : "MEDIUM");
+	}
 	fprintf(fp, "@PJL INFO STATUS\n");
 	fprintf(fp, "@PJL USTATUS DEVICE = ON\n");
 	fprintf(fp, "@PJL USTATUS JOB = ON\n");

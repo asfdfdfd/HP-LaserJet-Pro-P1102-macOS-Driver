@@ -76,10 +76,12 @@ EOF
     chmod 555 "$BIN_DIR/rastertozjs"
     codesign --force -s - "$BIN_DIR/rastertozjs" >/dev/null 2>&1 || true
 
-    echo "==> Installing status tool..."
-    cp build/p1102status "$BIN_DIR/p1102status"
-    chmod 555 "$BIN_DIR/p1102status"
-    codesign --force -s - "$BIN_DIR/p1102status" >/dev/null 2>&1 || true
+    echo "==> Installing status and EWS tools..."
+    for t in p1102status commandtozjs ewsproxy; do
+        cp "build/$t" "$BIN_DIR/$t"
+        chmod 555 "$BIN_DIR/$t"
+        codesign --force -s - "$BIN_DIR/$t" >/dev/null 2>&1 || true
+    done
 
     echo "==> Installing PPD..."
     mkdir -p "$PPD_DIR"
@@ -173,12 +175,19 @@ case "${1:-install}" in
         fi
         "$BIN_DIR/p1102status"
         ;;
+    --ews)
+        if [ "$(id -u)" = "0" ]; then
+            echo "Run without sudo: $0 --ews"
+            exit 1
+        fi
+        "$BIN_DIR/ewsproxy" "$2"
+        ;;
     --uninstall)
         need_root "$@"
         do_uninstall
         ;;
     *)
-        echo "Usage: $0 [install|--print-test|--status|--uninstall]"
+        echo "Usage: $0 [install|--print-test|--status|--ews [path]|--uninstall]"
         exit 1
         ;;
 esac
