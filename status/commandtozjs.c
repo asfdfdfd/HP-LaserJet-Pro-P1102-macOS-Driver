@@ -49,21 +49,6 @@ static int has_command(const char *cmd, const char *name)
 
 int main(int argc, char **argv)
 {
-    for (int i = 0; i < argc; ++i)
-        fprintf(stderr, "ERROR: commandtozjs: argv[%d]='%s'\n", i, argv[i]);
-
-    {
-        /* Diagnostics (CUPS sandbox test). */
-        fprintf(stderr, "ERROR: commandtozjs started pid=%d cwd=%s\n",
-                (int)getpid(), getenv("TMPDIR") ? getenv("TMPDIR") : "?");
-        const char *td = getenv("TMPDIR");
-        char path[512];
-        snprintf(path, sizeof(path), "%s/commandtozjs-ran", td ? td : "/tmp");
-        FILE *m = fopen(path, "w");
-        if (m) { fprintf(m, "pid=%d\n", (int)getpid()); fclose(m); }
-        else
-            fprintf(stderr, "ERROR: commandtozjs marker write failed\n");
-    }
 
     /* CUPS passes the command either on stdin or as the optional
      * argv[6] file argument (job document).  Read from whichever exists. */
@@ -83,15 +68,6 @@ int main(int argc, char **argv)
         fprintf(stderr, "ERROR: commandtozjs: no command on stdin\n");
         return 1;
     }
-    {
-        char dbg[80];
-        strncpy(dbg, cmd, sizeof(dbg) - 1);
-        dbg[sizeof(dbg) - 1] = 0;
-        for (char *p = dbg; *p; ++p)
-            if (*p == '\n' || *p == '\r')
-                *p = ' ';
-        fprintf(stderr, "ERROR: commandtozjs: cmd='%s'\n", dbg);
-    }
 
     /* Commands are case-insensitive; normalize. */
     for (char *p = cmd; *p; ++p)
@@ -99,14 +75,12 @@ int main(int argc, char **argv)
 
     if (has_command(cmd, "reportlevels"))
     {
-        setenv("EWS_DEBUG", "1", 1);
         ews_conn_t conn = {0};
         if (ews_open(&conn) != 0)
         {
             fprintf(stderr, "ERROR: commandtozjs: EWS interface unavailable\n");
             return 0;   /* no data; CUPS shows unknown levels */
         }
-        fprintf(stderr, "ERROR: commandtozjs: EWS opened ok\n");
 
         unsigned char *raw = NULL;
         size_t len = 0;
@@ -127,8 +101,6 @@ int main(int argc, char **argv)
             free(body);
         }
         free(raw);
-
-        fprintf(stderr, "ERROR: commandtozjs: reportlevels parsed\n");
 
         int lvl = -1;   /* unknown */
         if (level && *level)
