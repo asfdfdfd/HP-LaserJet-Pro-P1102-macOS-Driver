@@ -26,7 +26,7 @@
 *cupsVersion: 2.4
 *cupsModelNumber: 2
 *cupsManualCopies: True
-*cupsCommands: "ReportLevels ReportStatus"
+*cupsCommands: "ReportLevels ReportStatus PrintSelfTestPage"
 *cupsFilter: "application/vnd.cups-raster 100 /Library/Printers/HP/p1102raster.bundle/Contents/MacOS/rastertozjs"
 *cupsFilter: "application/vnd.cups-command 100 /Library/Printers/HP/p1102raster.bundle/Contents/MacOS/commandtozjs"
 *1284DeviceID: "MFG:Hewlett-Packard;MDL:HP LaserJet Professional P1102;CMD:ZJS,PJL,ACL,HTTP;DES:HP LaserJet Professional P1102;DRV:P1102rastertozjs;"

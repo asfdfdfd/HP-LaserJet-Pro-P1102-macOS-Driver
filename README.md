@@ -36,8 +36,10 @@ verified by the test suite.
 - Printer status, toner level, page counters and estimated pages
   remaining via `p1102status` (EWS HTTP over USB, the same mechanism
   HP's own `usbink` uses)
-- Supply level display in System Settings (CUPS `ReportLevels` command
-  filter, like the official HP driver's `commandToHPZJS`)
+- Supply level display in System Settings (CUPS `ReportLevels`/`ReportStatus`
+  command filter, like the official HP driver's `commandToHPZJS`)
+- `PrintSelfTestPage` CUPS command: prints a built-in test page
+  (resolution stripes, gray blocks, alignment marks)
 - EWS proxy: browse the printer's embedded web server (page counters,
   config XML) in a browser via `./install.sh --ews`
 - EconoMode (save toner), Jam Recovery and REt options

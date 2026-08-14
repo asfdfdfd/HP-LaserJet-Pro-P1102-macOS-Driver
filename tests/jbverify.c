@@ -65,9 +65,16 @@ static unsigned char *extract_jbig(const char *path, size_t *lenp)
 
 int main(int argc, char **argv)
 {
+    int any = 0;
+    if (argc >= 3 && strcmp(argv[1], "--any") == 0)
+    {
+        any = 1;
+        argv++;
+        argc--;
+    }
     if (argc < 2)
     {
-        fprintf(stderr, "Usage: jbverify zjs-file\n");
+        fprintf(stderr, "Usage: jbverify [--any] zjs-file\n");
         return 2;
     }
     size_t len = 0;
@@ -96,6 +103,27 @@ int main(int argc, char **argv)
     unsigned long h = jbg_dec_getheight(&s);
     unsigned char *im = jbg_dec_getimage(&s, 0);
     unsigned long bpl = w / 8;
+
+    if (any)
+    {
+        /* Just verify the page decodes and has visible content. */
+        unsigned long black = 0;
+        unsigned long tot = 0;
+        for (unsigned long y = 0; y < h; y += 17)
+            for (unsigned long x = 0; x < w; x += 17)
+            {
+                if (im[y * bpl + x / 8] & (0x80 >> (x % 8)))
+                    ++black;
+                ++tot;
+            }
+        jbg_dec_free(&s);
+        if (black < tot / 1000)
+        {
+            fprintf(stderr, "jbverify: page is blank\n");
+            return 1;
+        }
+        return 0;
+    }
 
     /* Scan rows for one with roughly half the pixels black (mid-gray) and
      * count transitions; dithering yields many transitions. */

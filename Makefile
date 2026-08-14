@@ -40,8 +40,9 @@ $(STATUS): status/p1102status.c $(EWS) | build
 	$(CC) $(CFLAGS) -Wno-unused-result -o $@ status/p1102status.c $(EWS) \
 	    -framework IOKit -framework CoreFoundation
 
-$(CMD): status/commandtozjs.c $(EWS) | build
+$(CMD): status/commandtozjs.c $(EWS) build/foo2zjs.o build/jbig.o build/jbig_ar.o | build
 	$(CC) $(CFLAGS) -Wno-unused-result -o $@ status/commandtozjs.c $(EWS) \
+	    build/foo2zjs.o build/jbig.o build/jbig_ar.o \
 	    -framework IOKit -framework CoreFoundation
 
 $(PROXY): status/ewsproxy.c $(EWS) | build

@@ -94,6 +94,16 @@ open(sys.argv[1] + "/gray_K.pgm", "wb").write(out)
 $TMP/mkraster -K < "$TMP/gray_K.pgm" > "$TMP/grayK.raster"
 check "grayK"       gray_thr.pbm  grayK.raster     "-K" "-z2 -P -L0 -r600x600 -g5100x6600 -p1 -m1 -s7 -n1" "Halftone=Threshold" prebuilt
 
+# PrintSelfTestPage: the command filter must emit a printable ZjStream
+printf '#CUPS-COMMAND\nPrintSelfTestPage\n' | build/commandtozjs > "$TMP/selftest.zjs" 2>/dev/null
+if $TMP/jbverify --any "$TMP/selftest.zjs"; then
+    echo "PASS  selftest"
+    pass=$((pass + 1))
+else
+    echo "FAIL  selftest"
+    fail=$((fail + 1))
+fi
+
 # Diffusion: the gradient page should be auto-dithered (not thresholded)
 $TMP/mkraster -g < "$TMP/grad.pgm" > "$TMP/grad.raster"
 build/rastertozjs 1 test grad 1 "" < "$TMP/grad.raster" > "$TMP/grad.zjs"
