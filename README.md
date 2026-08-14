@@ -62,7 +62,16 @@ meson test -C build --print-errorlogs
 
 The test suite verifies byte-identity of the ZjStream output against the
 reference `foo2zjs -z2 -P -L0` engine (after normalizing the PJL
-timestamp), plus self-test and halftone quality checks.
+timestamp), plus:
+
+- page-margin padding (the real macOS chain: cgpdftoraster renders only
+  the imageable area; the filter must rebuild the full page) at 600 dpi
+  and 1200x600 dpi (non-byte-aligned offset)
+- manual duplex with an odd page count (blank even-page padding)
+- printer-side copies (ZJI_DMCOPIES)
+- self-test page content (the Bayer gray blocks must be distinct)
+- halftone quality: auto-diffusion on gradients, no dithering when
+  Halftone=Threshold is forced
 
 ## Install
 

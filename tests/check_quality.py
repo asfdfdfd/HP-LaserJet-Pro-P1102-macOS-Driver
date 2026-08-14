@@ -34,11 +34,12 @@ def cmd_selftest(args):
                 [args.cmdtozjs, "1", "user", "SelfTest", "1", ""],
                 input=b"#CUPS-COMMAND\nPrintSelfTestPage\n",
                 stdout=fout, check=True)
-        r = subprocess.run([args.jbverify, "--any", out])
+        mode = "--selftest" if args.selftest_blocks else "--any"
+        r = subprocess.run([args.jbverify, mode, out])
         if r.returncode != 0:
             print("FAIL selftest", file=sys.stderr)
             return 1
-    print("PASS selftest")
+    print("PASS selftest" + ("-blocks" if args.selftest_blocks else ""))
     return 0
 
 
@@ -52,13 +53,16 @@ def cmd_diffuse(args):
                            check=True)
         zjs = os.path.join(td, "grad.zjs")
         with open(raster, "rb") as fin, open(zjs, "wb") as fout:
-            subprocess.run([args.filter, "1", "user", "Gradient", "1", ""],
-                           stdin=fin, stdout=fout, check=True)
-        r = subprocess.run([args.jbverify, zjs])
+            subprocess.run(
+                [args.filter, "1", "user", "Gradient", "1", args.opts],
+                stdin=fin, stdout=fout, check=True)
+        mode = "--not-dithered" if args.expect == "not-dithered" else None
+        cmd = [args.jbverify] + ([mode] if mode else []) + [zjs]
+        r = subprocess.run(cmd)
         if r.returncode != 0:
-            print("FAIL diffuse-auto", file=sys.stderr)
+            print(f"FAIL {args.expect or 'diffuse-auto'}", file=sys.stderr)
             return 1
-    print("PASS diffuse-auto")
+    print("PASS " + (args.expect or "diffuse-auto"))
     return 0
 
 
@@ -69,11 +73,15 @@ def main():
     p1 = sub.add_parser("selftest")
     p1.add_argument("--cmdtozjs", required=True)
     p1.add_argument("--jbverify", required=True)
+    p1.add_argument("--selftest-blocks", action="store_true")
 
     p2 = sub.add_parser("diffuse")
     p2.add_argument("--filter", required=True)
     p2.add_argument("--mkraster", required=True)
     p2.add_argument("--jbverify", required=True)
+    p2.add_argument("--opts", default="")
+    p2.add_argument("--expect", default="dithered",
+                    choices=["dithered", "not-dithered"])
 
     args = ap.parse_args()
     if args.mode == "selftest":

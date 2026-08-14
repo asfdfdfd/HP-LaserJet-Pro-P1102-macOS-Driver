@@ -65,10 +65,22 @@ static unsigned char *extract_jbig(const char *path, size_t *lenp)
 
 int main(int argc, char **argv)
 {
-    int any = 0;
+    int any = 0, selftest = 0, notdithered = 0;
     if (argc >= 3 && strcmp(argv[1], "--any") == 0)
     {
         any = 1;
+        argv++;
+        argc--;
+    }
+    else if (argc >= 3 && strcmp(argv[1], "--selftest") == 0)
+    {
+        selftest = 1;
+        argv++;
+        argc--;
+    }
+    else if (argc >= 3 && strcmp(argv[1], "--not-dithered") == 0)
+    {
+        notdithered = 1;
         argv++;
         argc--;
     }
@@ -103,6 +115,83 @@ int main(int argc, char **argv)
     unsigned long h = jbg_dec_getheight(&s);
     unsigned char *im = jbg_dec_getimage(&s, 0);
     unsigned long bpl = w / 8;
+
+    if (selftest)
+    {
+        /* Self-test page: the three gray blocks (Bayer 25/50/75%) must
+         * have clearly different black coverage.  Decoded page is the
+         * 128-rounded bitmap (5120 wide); blocks live at x = 700+i*1380,
+         * y = 2900..3700, 1000 px wide, no raster padding. */
+        static const struct { int x0, y0; } blocks[3] = {
+            { 700, 2900 }, { 2080, 2900 }, { 3460, 2900 } };
+        double cov[3];
+        for (int i = 0; i < 3; ++i)
+        {
+            unsigned long black = 0, tot = 0;
+            for (unsigned long y = (unsigned long)blocks[i].y0;
+                 y < blocks[i].y0 + 800; y += 3)
+                for (unsigned long x = (unsigned long)blocks[i].x0;
+                     x < blocks[i].x0 + 1000; x += 3)
+                {
+                    if (im[y * bpl + x / 8] & (0x80 >> (x % 8)))
+                        ++black;
+                    ++tot;
+                }
+            cov[i] = (double)black / tot;
+        }
+        jbg_dec_free(&s);
+        fprintf(stderr, "jbverify: gray blocks %.0f%%/%.0f%%/%.0f%%\n",
+                cov[0] * 100, cov[1] * 100, cov[2] * 100);
+        if (cov[0] < 0.15 || cov[0] > 0.35 ||
+            cov[1] < 0.40 || cov[1] > 0.60 ||
+            cov[2] < 0.65 || cov[2] > 0.85 ||
+            !(cov[0] < cov[1] && cov[1] < cov[2]))
+        {
+            fprintf(stderr, "jbverify: gray blocks not distinct\n");
+            return 1;
+        }
+        return 0;
+    }
+
+    if (notdithered)
+    {
+        /* A hard-thresholded gradient must NOT show dithering: find a row
+         * with substantial black coverage and require few transitions. */
+        int found = 0;
+        for (unsigned long y = 0; y < h; y += 7)
+        {
+            unsigned long black = 0;
+            unsigned char *r = im + y * bpl;
+            for (unsigned long x = 0; x < w; ++x)
+                if (r[x / 8] & (0x80 >> (x % 8)))
+                    ++black;
+            double frac = (double)black / w;
+            if (frac > 0.20 && frac < 0.80)
+            {
+                long trans = 0;
+                int prev = -1;
+                for (unsigned long x = 0; x < w; ++x)
+                {
+                    int cur = (r[x / 8] & (0x80 >> (x % 8))) ? 1 : 0;
+                    if (prev >= 0 && cur != prev)
+                        ++trans;
+                    prev = cur;
+                }
+                if (trans < (long)(w / 20))
+                {
+                    found = 1;
+                    break;
+                }
+            }
+        }
+        jbg_dec_free(&s);
+        if (!found)
+        {
+            fprintf(stderr, "jbverify: page looks dithered\n");
+            return 1;
+        }
+        return 0;
+    }
 
     if (any)
     {

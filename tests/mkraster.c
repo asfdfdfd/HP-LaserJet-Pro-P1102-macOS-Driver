@@ -2,7 +2,10 @@
  * mkraster - test helper: P4 (pbmraw) or P5 (pgmraw, -g) -> CUPS raster
  * (v3), for testing the rastertozjs filter without a full CUPS stack.
  *
- * Usage: mkraster [-r XRESxYRES] [-s WxHpoints] [-g] [in.pbm] > out.raster
+ * Usage: mkraster [-r XRESxYRES] [-s WxHpoints] [-m MARGINPT] [-g] [-K]
+ *         [in.pbm] > out.raster
+ *   -m MARGINPT  set symmetric page margins (points): the raster covers
+ *                only the imageable area, like cgpdftoraster does
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -17,6 +20,7 @@ int main(int argc, char **argv)
     float pw = 612, ph = 792;
     int gray = 0;
     int kmode = 0;   /* -K: read P5 where 0=white,255=black, write K 8bpp */
+    float margin = 0;
     int i;
     FILE *in = stdin;
     cups_page_header2_t hdr;
@@ -36,6 +40,12 @@ int main(int argc, char **argv)
         {
             if (sscanf(argv[++i], "%fx%f", &pw, &ph) != 2)
                 die("bad -s");
+        }
+        else if (strcmp(argv[i], "-m") == 0 && i + 1 < argc)
+        {
+            margin = (float)atof(argv[++i]);
+            if (margin < 0 || margin >= pw / 2 || margin >= ph / 2)
+                die("bad -m");
         }
         else if (strcmp(argv[i], "-g") == 0)
             gray = 1;
@@ -84,10 +94,10 @@ int main(int argc, char **argv)
     hdr.cupsNumColors = 1;
     hdr.cupsPageSize[0] = pw;
     hdr.cupsPageSize[1] = ph;
-    hdr.cupsImagingBBox[0] = 0;
-    hdr.cupsImagingBBox[1] = 0;
-    hdr.cupsImagingBBox[2] = pw;
-    hdr.cupsImagingBBox[3] = ph;
+    hdr.cupsImagingBBox[0] = margin;
+    hdr.cupsImagingBBox[1] = margin;
+    hdr.cupsImagingBBox[2] = pw - margin;
+    hdr.cupsImagingBBox[3] = ph - margin;
 
     ras = cupsRasterOpen(1, CUPS_RASTER_WRITE);
     if (!ras) die("cupsRasterOpen failed");

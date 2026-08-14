@@ -175,3 +175,47 @@ test('selftest', python3,
 test('diffuse-auto', python3,
   args: [check_quality, 'diffuse',
          '--filter', rastertozjs, '--mkraster', mkraster, '--jbverify', jbverify])
+
+# Raster geometry matches the real macOS chain: imageable area only, the
+# filter must pad it back to the full page (margins 4 mm).
+test('margins-600', python3,
+  args: [check, 'margins600',
+         '--filter', rastertozjs, '--refmain', refmain, '--mkraster', mkraster,
+         '--pbm', 'test600_im.pbm', '--ref-pbm', 'test600_margins.pbm',
+         '--raster-args', '-m 11.34',
+         '--refargs', REFARGS])
+
+test('margins-1200', python3,
+  args: [check, 'margins1200',
+         '--filter', rastertozjs, '--refmain', refmain, '--mkraster', mkraster,
+         '--pbm', 'test1200_im.pbm', '--ref-pbm', 'test1200_margins.pbm',
+         '--raster-args', '-m 11.34 -r 1200x600',
+         '--refargs', '-z2 -P -L0 -r1200x600 -g10200x6600 -p1 -m1 -s7 -n1'])
+
+# Manual duplex with an odd page count: the engine pads a blank even page.
+test('duplex-odd', python3,
+  args: [check, 'duplexodd',
+         '--filter', rastertozjs, '--refmain', refmain, '--mkraster', mkraster,
+         '--pbm', 'three.pbm',
+         '--opts', 'Duplex=DuplexTumble',
+         '--refargs', '-z2 -P -L0 -d4 -r600x600 -g5100x6600 -p1 -m1 -s7 -n1'])
+
+# Printer-side copies via ZJI_DMCOPIES.
+test('copies', python3,
+  args: [check, 'copies3',
+         '--filter', rastertozjs, '--refmain', refmain, '--mkraster', mkraster,
+         '--pbm', 'test600.pbm',
+         '--copies', '3',
+         '--refargs', '-z2 -P -L0 -r600x600 -g5100x6600 -p1 -m1 -s7 -n3'])
+
+# Self-test page: the Bayer gray blocks must be visibly distinct.
+test('selftest-blocks', python3,
+  args: [check_quality, 'selftest',
+         '--cmdtozjs', commandtozjs, '--jbverify', jbverify,
+         '--selftest-blocks'])
+
+# Forcing Threshold on a gradient must NOT dither (counter-test).
+test('threshold-forced', python3,
+  args: [check_quality, 'diffuse',
+         '--filter', rastertozjs, '--mkraster', mkraster, '--jbverify', jbverify,
+         '--opts', 'Halftone=Threshold', '--expect', 'not-dithered'])

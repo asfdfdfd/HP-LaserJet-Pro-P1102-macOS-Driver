@@ -47,6 +47,7 @@ def main():
     ap.add_argument("--raster-args", default="")
     ap.add_argument("--refargs", default=REFARGS_DEFAULT)
     ap.add_argument("--opts", default="")
+    ap.add_argument("--copies", type=int, default=1)
     args = ap.parse_args()
 
     raster_pbm = args.raster_pbm or args.pbm
@@ -66,7 +67,8 @@ def main():
         out_zjs = os.path.join(td, "out.zjs")
         with open(raster, "rb") as fin, open(out_zjs, "wb") as fout:
             subprocess.run(
-                [args.filter, "1", "test", args.name, "1", args.opts],
+                [args.filter, "1", "test", args.name, str(args.copies),
+                 args.opts],
                 stdin=fin, stdout=fout, check=True)
 
         ref_zjs = os.path.join(td, "ref.zjs")
