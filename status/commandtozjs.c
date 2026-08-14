@@ -21,13 +21,13 @@
 
 #define SUPPLY_LOW 20     /* below this % report marker-supply-low-report */
 
-static char *read_command(void)
+static char *read_stream(FILE *in)
 {
     size_t cap = 1024, len = 0;
     char *buf = malloc(cap);
     if (!buf) return NULL;
     int c;
-    while ((c = getchar()) != EOF)
+    while ((c = fgetc(in)) != EOF)
     {
         if (len + 1 >= cap)
         {
@@ -49,8 +49,8 @@ static int has_command(const char *cmd, const char *name)
 
 int main(int argc, char **argv)
 {
-    (void)argc;
-    (void)argv;
+    for (int i = 0; i < argc; ++i)
+        fprintf(stderr, "ERROR: commandtozjs: argv[%d]='%s'\n", i, argv[i]);
 
     {
         /* Diagnostics (CUPS sandbox test). */
@@ -65,7 +65,19 @@ int main(int argc, char **argv)
             fprintf(stderr, "ERROR: commandtozjs marker write failed\n");
     }
 
-    char *cmd = read_command();
+    /* CUPS passes the command either on stdin or as the optional
+     * argv[6] file argument (job document).  Read from whichever exists. */
+    FILE *cmd_in = stdin;
+    if (argc > 6 && argv[6] && strcmp(argv[6], "-") != 0)
+    {
+        cmd_in = fopen(argv[6], "r");
+        if (!cmd_in)
+            fprintf(stderr, "ERROR: commandtozjs: cannot open '%s'\n",
+                    argv[6]);
+    }
+    char *cmd = read_stream(cmd_in);
+    if (cmd_in != stdin)
+        fclose(cmd_in);
     if (!cmd)
     {
         fprintf(stderr, "ERROR: commandtozjs: no command on stdin\n");
