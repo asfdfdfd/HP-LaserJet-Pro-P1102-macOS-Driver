@@ -67,7 +67,19 @@ int main(int argc, char **argv)
 
     char *cmd = read_command();
     if (!cmd)
+    {
+        fprintf(stderr, "ERROR: commandtozjs: no command on stdin\n");
         return 1;
+    }
+    {
+        char dbg[80];
+        strncpy(dbg, cmd, sizeof(dbg) - 1);
+        dbg[sizeof(dbg) - 1] = 0;
+        for (char *p = dbg; *p; ++p)
+            if (*p == '\n' || *p == '\r')
+                *p = ' ';
+        fprintf(stderr, "ERROR: commandtozjs: cmd='%s'\n", dbg);
+    }
 
     /* Commands are case-insensitive; normalize. */
     for (char *p = cmd; *p; ++p)
@@ -75,6 +87,7 @@ int main(int argc, char **argv)
 
     if (has_command(cmd, "reportlevels"))
     {
+        setenv("EWS_DEBUG", "1", 1);
         ews_conn_t conn = {0};
         if (ews_open(&conn) != 0)
         {

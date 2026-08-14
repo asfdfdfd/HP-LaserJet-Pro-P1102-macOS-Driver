@@ -31,10 +31,15 @@ static io_service_t ews_find_interface(void)
     CFMutableDictionaryRef matching = IOServiceMatching("IOUSBHostInterface");
     io_iterator_t iter = 0;
     IOReturn kr = IOServiceGetMatchingServices(kIOMainPortDefault, matching, &iter);
+    if (getenv("EWS_DEBUG"))
+        fprintf(stderr, "ERROR: ews_find_interface: IOServiceGetMatchingServices "
+                        "kr=%x iter=%p\n", kr, (void *)iter);
     if (kr != kIOReturnSuccess || !iter)
         return 0;
 
     io_service_t s;
+    if (getenv("EWS_DEBUG"))
+        fprintf(stderr, "ERROR: ews_find_interface: enumerating\n");
     while ((s = IOIteratorNext(iter)))
     {
         CFMutableDictionaryRef props = NULL;
@@ -50,6 +55,9 @@ static io_service_t ews_find_interface(void)
             if (nc) CFNumberGetValue(nc, kCFNumberIntType, &icls);
             CFRelease(props);
         }
+        if (getenv("EWS_DEBUG"))
+            fprintf(stderr, "ERROR: ews_find_interface: svc v=%d p=%d cls=%d\n",
+                    v, p, icls);
         if (v == VID && p == PID && icls == IFACE_CLASS_EWS)
         {
             intf = s;
@@ -58,6 +66,8 @@ static io_service_t ews_find_interface(void)
         IOObjectRelease(s);
     }
     IOObjectRelease(iter);
+    if (getenv("EWS_DEBUG"))
+        fprintf(stderr, "ERROR: ews_find_interface: found=%d\n", intf != 0);
     return intf;
 }
 
@@ -65,7 +75,11 @@ int ews_open(ews_conn_t *c)
 {
     io_service_t intf = ews_find_interface();
     if (!intf)
+    {
+        if (getenv("EWS_DEBUG"))
+            fprintf(stderr, "ERROR: ews_open: interface not found\n");
         return -1;
+    }
 
     IOCFPlugInInterface **plug = NULL;
     SInt32 score = 0;
