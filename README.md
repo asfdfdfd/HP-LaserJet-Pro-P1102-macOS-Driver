@@ -153,3 +153,8 @@ PJL timestamp) against the reference `foo2zjs -z2 -P -L0` binary.
 - The Zenographics ZjStream protocol was reverse engineered by the foo2zjs
   community; it is also used by HP's own drivers (`rastertozjs` in the
   official HP package).
+- Upstream foo2zjs is maintained at
+  [github.com/koenkooi/foo2zjs](https://github.com/koenkooi/foo2zjs), with
+  a Debian-maintained fixes branch at
+  [github.com/OpenPrinting/foo2zjs](https://github.com/OpenPrinting/foo2zjs)
+  (the engine we vendor is functionally identical for the P1102).

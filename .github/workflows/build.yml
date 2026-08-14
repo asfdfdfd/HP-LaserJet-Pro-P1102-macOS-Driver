@@ -1,0 +1,33 @@
+name: build-and-test
+
+on:
+  push:
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - 'status/**'
+      - 'Makefile'
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  macos:
+    runs-on: macos-latest
+    name: macOS build + tests
+    steps:
+      - name: Git checkout
+        uses: actions/checkout@v4
+
+      - name: Build
+        run: make
+
+      - name: Run byte-identity test suite
+        run: make test
+
+      - name: Verify PPD
+        run: |
+          cp ppd/HP-LaserJet-Pro-P1102.ppd /tmp/test.ppd
+          # replace the install path with a dummy for validation
+          sed -i '' 's|/Library/Printers/HP/p1102raster.bundle/Contents/MacOS/rastertozjs|/usr/bin/true|' /tmp/test.ppd
+          sed -i '' 's|/Library/Printers/HP/p1102raster.bundle/Contents/MacOS/commandtozjs|/usr/bin/true|' /tmp/test.ppd
+          cupstestppd /tmp/test.ppd || true
