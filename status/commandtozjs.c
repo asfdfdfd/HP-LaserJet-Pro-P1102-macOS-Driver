@@ -176,6 +176,7 @@ static int print_self_test(void)
     /* resolution bars: 1,2,4,8,16 px vertical stripes */
     {
         int widths[5] = { 1, 2, 4, 8, 16 };
+        int gaps[5]   = { 8, 8, 8, 8, 16 };
         const char *labels[5] = { "1 PX", "2 PX", "4 PX", "8 PX", "16 PX" };
         int y = 1300, y2 = 2400, i;
         st_text(bm, 900, 1150, "RESOLUTION STRIPES", 2);
@@ -183,7 +184,7 @@ static int print_self_test(void)
         {
             int x0 = 700 + i * 780, x;
             st_text(bm, x0, y2 + 20, labels[i], 2);
-            for (x = 0; x < 640; x += 2 * widths[i])
+            for (x = 0; x < 640; x += widths[i] + gaps[i])
                 st_rect(bm, x0 + x, y, x0 + x + widths[i] - 1, y2);
         }
     }
