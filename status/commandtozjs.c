@@ -188,8 +188,10 @@ static int print_self_test(void)
         }
     }
 
-    /* gray blocks: 25% / 50% / 75% dither patterns */
+    /* gray blocks: 25% / 50% / 75% via a 2x2 Bayer matrix
+     * (levels 1/2/3 of 4 -> exact 25/50/75% coverage) */
     {
+        static const int bayer[2][2] = { { 0, 2 }, { 3, 1 } };
         int y = 2900, y2 = 3700, i;
         const char *labels[3] = { "25%", "50%", "75%" };
         st_text(bm, 900, 2700, "GRAY BLOCKS (DITHER)", 2);
@@ -198,14 +200,8 @@ static int print_self_test(void)
             int x0 = 700 + i * 1380, x, y2c;
             for (y2c = y; y2c <= y2; ++y2c)
                 for (x = 0; x < 1000; ++x)
-                {
-                    int on = 0;
-                    if (i == 0)      on = ((x / 2) + (y2c / 2)) & 1;
-                    else if (i == 1) on = (x + y2c) & 1;
-                    else             on = !(((x / 2) + (y2c / 2)) & 1);
-                    if (on)
+                    if (bayer[y2c & 1][x & 1] < i + 1)
                         st_pixel(bm, x0 + x, y2c);
-                }
             st_text(bm, x0, y2 + 20, labels[i], 2);
         }
     }
