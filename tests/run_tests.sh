@@ -27,11 +27,11 @@ pass=0
 fail=0
 
 check() {
-    local name=$1 pbm=$2 raster=$3 args=$4 refargs=$5
-    if [ -z "$6" ]; then
+    local name=$1 pbm=$2 raster=$3 args=$4 refargs=$5 opts=$6
+    if [ -z "$7" ]; then
         $TMP/mkraster $args < "$TMP/$pbm" > "$TMP/$raster"
     fi
-    build/rastertozjs 1 test "$name" 1 "" < "$TMP/$raster" > "$TMP/out_$name.zjs"
+    build/rastertozjs 1 test "$name" 1 "${opts:-}" < "$TMP/$raster" > "$TMP/out_$name.zjs"
     $TMP/refmain $refargs < "$TMP/$pbm" > "$TMP/ref_$name.zjs"
     if python3 -c '
 import re, sys
@@ -50,6 +50,9 @@ sys.exit(0 if a == b else 1)
 check "letter600"   test600.pbm   test600.raster   ""   "-z2 -P -L0 -r600x600 -g5100x6600 -p1 -m1 -s7 -n1"
 check "noise1200"   testnoise.pbm testnoise.raster "-r 1200x600" "-z2 -P -L0 -r1200x600 -g10200x6600 -p1 -m1 -s7 -n1"
 check "twopages"    two.pbm       two.raster       ""   "-z2 -P -L0 -r600x600 -g5100x6600 -p1 -m1 -s7 -n1"
+check "duplex2"     two.pbm       two.raster       ""   "-z2 -P -L0 -d4 -r600x600 -g5100x6600 -p1 -m1 -s7 -n1" "Duplex=DuplexTumble"
+# Duplex=DuplexNoTumble maps to -d5
+check "duplex3"     two.pbm       two.raster       ""   "-z2 -P -L0 -d5 -r600x600 -g5100x6600 -p1 -m1 -s7 -n1" "Duplex=DuplexNoTumble"
 # Grayscale: threshold the PGM the same way the filter does (px < 128 -> black)
 python3 -c '
 import sys
@@ -70,7 +73,7 @@ for y in range(h):
 open(sys.argv[1] + "/gray_thr.pbm", "wb").write(out)
 ' "$TMP"
 $TMP/mkraster -g < "$TMP/gray.pgm" > "$TMP/gray.raster"
-check "gray"        gray_thr.pbm  gray.raster      "-g" "-z2 -P -L0 -r600x600 -g5100x6600 -p1 -m1 -s7 -n1" prebuilt
+check "gray"        gray_thr.pbm  gray.raster      "-g" "-z2 -P -L0 -r600x600 -g5100x6600 -p1 -m1 -s7 -n1" "" prebuilt
 
 # K 8bpp (the colorspace cgpdftoraster actually produces): PGM is stored
 # inverted (0=white, 255=black), expected bitmap = same gray_thr.pbm.
@@ -87,7 +90,7 @@ for y in range(h):
 open(sys.argv[1] + "/gray_K.pgm", "wb").write(out)
 ' "$TMP"
 $TMP/mkraster -K < "$TMP/gray_K.pgm" > "$TMP/grayK.raster"
-check "grayK"       gray_thr.pbm  grayK.raster     "-K" "-z2 -P -L0 -r600x600 -g5100x6600 -p1 -m1 -s7 -n1" prebuilt
+check "grayK"       gray_thr.pbm  grayK.raster     "-K" "-z2 -P -L0 -r600x600 -g5100x6600 -p1 -m1 -s7 -n1" "" prebuilt
 
 echo
 echo "PASS: $pass  FAIL: $fail"

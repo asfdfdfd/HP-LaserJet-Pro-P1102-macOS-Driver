@@ -144,6 +144,13 @@
 *Quality Normal/Normal: ""
 *Quality Draft/Draft: "<</cupsInteger15 2>>setpagedevice"
 *CloseUI: *Quality
+*OpenUI *Duplex/Two-Sided Printing: PickOne
+*OrderDependency: 20 AnySetup *Duplex
+*DefaultDuplex: None
+*Duplex None/Off: ""
+*Duplex DuplexTumble/On (Flip on Long Edge): ""
+*Duplex DuplexNoTumble/On (Flip on Short Edge): ""
+*CloseUI: *Duplex
 *OpenUI *PrintDensity/Print Density: PickOne
 *OrderDependency: 10 AnySetup *PrintDensity
 *DefaultPrintDensity: Density3

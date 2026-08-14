@@ -34,6 +34,7 @@ typedef struct {
     const char *media_source; /* "Auto", ... */
     int  draft;               /* Quality=draft */
     int  density;             /* 0 = not set */
+    int  duplex;              /* 0=off, 4=manual long edge, 5=manual short edge */
     int  copies;
 } job_opts_t;
 
@@ -401,6 +402,7 @@ static void parse_options(const char *options, job_opts_t *opts)
     opts->media_source = NULL;
     opts->draft = 0;
     opts->density = 0;
+    opts->duplex = 0;
     opts->copies = 1;
 
     if (!options || !*options)
@@ -421,6 +423,15 @@ static void parse_options(const char *options, job_opts_t *opts)
             opts->media_type = eq + 1;
         else if (strcasecmp(tok, "MediaSource") == 0)
             opts->media_source = eq + 1;
+        else if (strcasecmp(tok, "Duplex") == 0)
+        {
+            if (strcasecmp(eq + 1, "DuplexTumble") == 0)
+                opts->duplex = 4;       /* manual, long edge */
+            else if (strcasecmp(eq + 1, "DuplexNoTumble") == 0)
+                opts->duplex = 5;       /* manual, short edge */
+            else
+                opts->duplex = 0;
+        }
         else if (strcasecmp(tok, "Quality") == 0)
             opts->draft = (strcasecmp(eq + 1, "draft") == 0);
         else if (strcasecmp(tok, "Density") == 0)
@@ -444,7 +455,7 @@ int main(int argc, char **argv)
     job_opts_t opts;
     int zargc;
     char *zargv[16];
-    char rbuf[32], gbuf[32], pb[16], mb[16], sb[16], nb[16], tb[16];
+    char rbuf[32], gbuf[32], pb[16], mb[16], sb[16], nb[16], tb[16], db[16];
     unsigned resx, resy;
     int paper, media, source;
     int rc;
@@ -505,6 +516,9 @@ int main(int argc, char **argv)
     snprintf(mb, sizeof(mb), "-m%d", media);
     snprintf(sb, sizeof(sb), "-s%d", source);
     snprintf(nb, sizeof(nb), "-n%d", opts.copies);
+    db[0] = 0;
+    if (opts.duplex)
+        snprintf(db, sizeof(db), "-d%d", opts.duplex);
     tb[0] = 0;
     if (opts.draft)
         strcpy(tb, "-t");
@@ -520,6 +534,8 @@ int main(int argc, char **argv)
     zargv[zargc++] = mb;
     zargv[zargc++] = sb;
     zargv[zargc++] = nb;
+    if (db[0])
+        zargv[zargc++] = db;
     if (tb[0])
         zargv[zargc++] = tb;
     if (opts.density >= 1 && opts.density <= 5)

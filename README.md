@@ -28,6 +28,8 @@ verified by the test suite.
 - Letter / A4 / A5 / A6 / B5 / Executive / Legal / envelopes / postcard / 16K
 - Media types (envelope, letterhead, transparency, labels, ...)
 - Manual feed, draft mode, print density
+- Two-sided printing (manual duplex): odd pages print, the printer pauses
+  for you to flip the paper, then even pages print flipped
 - Multiple copies (printer-side)
 - Printer status + toner level via `p1102status` (EWS HTTP over USB,
   the same mechanism HP's own `usbink` uses)
@@ -51,6 +53,7 @@ Then print:
 
 ```
 lp -d HP_P1102 tests/testpage.pdf
+lp -d HP_P1102 -o Duplex=DuplexTumble some-2-page.pdf
 ```
 
 Alternatively add the printer in System Settings → Printers & Scanners and
