@@ -19,6 +19,8 @@ make >/dev/null
 $CC $CFLAGS -o $TMP/refmain tests/refmain.c src/zjs/vendor/foo2zjs.c \
     src/zjs/vendor/jbig.c src/zjs/vendor/jbig_ar.c $LIBS
 $CC $CFLAGS -o $TMP/mkraster tests/mkraster.c $LIBS
+$CC $CFLAGS -I src/zjs/vendor -o $TMP/jbverify tests/jbverify.c \
+    src/zjs/vendor/jbig.c src/zjs/vendor/jbig_ar.c
 
 echo "==> generating fixtures..."
 python3 tests/mkfixtures.py "$TMP"
@@ -73,7 +75,7 @@ for y in range(h):
 open(sys.argv[1] + "/gray_thr.pbm", "wb").write(out)
 ' "$TMP"
 $TMP/mkraster -g < "$TMP/gray.pgm" > "$TMP/gray.raster"
-check "gray"        gray_thr.pbm  gray.raster      "-g" "-z2 -P -L0 -r600x600 -g5100x6600 -p1 -m1 -s7 -n1" "" prebuilt
+check "gray"        gray_thr.pbm  gray.raster      "-g" "-z2 -P -L0 -r600x600 -g5100x6600 -p1 -m1 -s7 -n1" "Halftone=Threshold" prebuilt
 
 # K 8bpp (the colorspace cgpdftoraster actually produces): PGM is stored
 # inverted (0=white, 255=black), expected bitmap = same gray_thr.pbm.
@@ -90,7 +92,18 @@ for y in range(h):
 open(sys.argv[1] + "/gray_K.pgm", "wb").write(out)
 ' "$TMP"
 $TMP/mkraster -K < "$TMP/gray_K.pgm" > "$TMP/grayK.raster"
-check "grayK"       gray_thr.pbm  grayK.raster     "-K" "-z2 -P -L0 -r600x600 -g5100x6600 -p1 -m1 -s7 -n1" "" prebuilt
+check "grayK"       gray_thr.pbm  grayK.raster     "-K" "-z2 -P -L0 -r600x600 -g5100x6600 -p1 -m1 -s7 -n1" "Halftone=Threshold" prebuilt
+
+# Diffusion: the gradient page should be auto-dithered (not thresholded)
+$TMP/mkraster -g < "$TMP/grad.pgm" > "$TMP/grad.raster"
+build/rastertozjs 1 test grad 1 "" < "$TMP/grad.raster" > "$TMP/grad.zjs"
+if $TMP/jbverify "$TMP/grad.zjs"; then
+    echo "PASS  diffuse-auto"
+    pass=$((pass + 1))
+else
+    echo "FAIL  diffuse-auto"
+    fail=$((fail + 1))
+fi
 
 echo
 echo "PASS: $pass  FAIL: $fail"

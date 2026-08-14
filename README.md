@@ -28,6 +28,8 @@ verified by the test suite.
 - Letter / A4 / A5 / A6 / B5 / Executive / Legal / envelopes / postcard / 16K
 - Media types (envelope, letterhead, transparency, labels, ...)
 - Manual feed, draft mode, print density
+- Halftoning: Auto (crisp threshold for text pages, Floyd-Steinberg
+  error diffusion for photos/gradients) or forced Threshold/Diffusion
 - Two-sided printing (manual duplex): odd pages print, the printer pauses
   for you to flip the paper, then even pages print flipped
 - Multiple copies (printer-side)

@@ -62,7 +62,16 @@ with open(f"{OUT}/p1.pbm", "rb") as a, open(f"{OUT}/p2.pbm", "rb") as b, \
     out.write(a.read())
     out.write(b.read())
 
-# 4. Grayscale page @ 600x600 (threshold test)
+# 4. Gradient page (auto-halftone should pick diffusion)
+def gradrow(y):
+    r = bytearray()
+    for x in range(5100):
+        r.append((x * 255) // 5100)
+    return bytes(r)
+
+p5("grad.pgm", 5100, 6600, gradrow)
+
+# 5. Grayscale page @ 600x600 (threshold test)
 def gray(y):
     r = bytearray()
     for x in range(5100):

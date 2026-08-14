@@ -158,6 +158,13 @@
 *REt False/Off: ""
 *REt True/On: ""
 *CloseUI: *REt
+*OpenUI *Halftone/Halftone: PickOne
+*OrderDependency: 20 AnySetup *Halftone
+*DefaultHalftone: Auto
+*Halftone Auto/Auto: ""
+*Halftone Threshold/Threshold (crisp text): ""
+*Halftone Diffusion/Diffusion (smooth photos): ""
+*CloseUI: *Halftone
 *OpenUI *Quality/Print Quality: PickOne
 *OrderDependency: 10 AnySetup *Quality
 *DefaultQuality: Normal

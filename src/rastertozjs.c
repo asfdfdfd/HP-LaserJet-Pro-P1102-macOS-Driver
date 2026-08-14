@@ -38,6 +38,7 @@ typedef struct {
     int  econo;               /* EconoMode (save toner) */
     int  jamrecovery;         /* JamRecovery PJL */
     int  ret;                 /* REt (resolution enhancement), default on */
+    int  halftone;            /* HT_AUTO / HT_THRESHOLD / HT_DIFFUSION */
     int  copies;
 } job_opts_t;
 
@@ -53,6 +54,7 @@ typedef struct {
     unsigned        height;
     unsigned        res_x;    /* HWResolution from raster header */
     unsigned        res_y;
+    int             halftone; /* HT_AUTO / HT_THRESHOLD / HT_DIFFUSION */
 } ctx_t;
 
 static void publish_header(ctx_t *ctx, const cups_page_header2_t *hdr)
@@ -165,6 +167,42 @@ static void convert_row(const unsigned char *line, unsigned char *pbmrow,
 }
 
 /*
+ * Halftone handling: cgpdftoraster delivers 8-bit grayscale; a hard 50%
+ * threshold keeps text crisp but posterizes photos.  With "Diffusion"
+ * (Floyd-Steinberg) or "Auto" (pages with enough mid-gray pixels) we
+ * error-diffuse instead.  "blackness" here is 0=white .. 255=black.
+ */
+#define HT_AUTO       0
+#define HT_THRESHOLD  1
+#define HT_DIFFUSION  2
+#define HT_MID_RATIO  0.02   /* auto: >2% mid-gray pixels -> diffuse */
+
+static void row_diffuse(const unsigned char *line, unsigned char *pbmrow,
+                        unsigned w, int *err_cur, int *err_next)
+{
+    unsigned x;
+    memset(pbmrow, 0, (w + 7) / 8);
+    for (x = 0; x < w; ++x)
+    {
+        int v = line[x] + err_cur[x];
+        int e;
+        if (v >= 128)
+        {
+            pbmrow[x / 8] |= 0x80 >> (x & 7);
+            e = v - 255;
+        }
+        else
+            e = v;
+        if (e > 255) e = 255;
+        else if (e < -255) e = -255;
+        if (x + 1 < w) err_cur[x + 1] += e * 7 / 16;
+        if (x > 0)     err_next[x - 1] += e * 3 / 16;
+        err_next[x] += e * 5 / 16;
+        if (x + 1 < w) err_next[x + 1] += e * 1 / 16;
+    }
+}
+
+/*
  * Page geometry: macOS cgpdftoraster renders only the imageable area
  * (the PPD margins are NOT part of the bitmap), whereas the ZjStream
  * expects a full-page bitmap with white margins.  Rebuild that here.
@@ -231,6 +269,8 @@ static void *pbm_writer(void *arg)
     cups_raster_t *ras = cupsRasterOpen(0, CUPS_RASTER_READ);
     cups_page_header2_t hdr;
     unsigned char *line = NULL, *pbmrow = NULL, *fullrow = NULL;
+    unsigned char *pagebuf = NULL;
+    int *err_cur = NULL, *err_next = NULL;
     unsigned rowbpl = 0, fullbpl = 0;
     int first = 1;
 
@@ -284,15 +324,90 @@ static void *pbm_writer(void *arg)
             }
         }
 
+        /* 8-bit grayscale pages are buffered so we can decide between a
+         * crisp threshold and error-diffusion halftoning. */
+        int gray8 = (hdr.cupsColorSpace == CUPS_CSPACE_K ||
+                     hdr.cupsColorSpace == CUPS_CSPACE_W ||
+                     hdr.cupsColorSpace == CUPS_CSPACE_SW) &&
+                    hdr.cupsBitsPerColor == 8 && hdr.cupsNumColors == 1;
+        int mode = HT_THRESHOLD;
+        unsigned char *src = NULL;
+
+        if (gray8 && ctx->halftone != HT_THRESHOLD)
+        {
+            size_t rl = hdr.cupsBytesPerLine;
+            unsigned char *nb = realloc(pagebuf, rl * g.img_h);
+            if (!nb)
+            {
+                fprintf(stderr, "rastertozjs: out of memory (page buffer)\n");
+                fail(ctx);
+                fclose(out);
+                return NULL;
+            }
+            pagebuf = nb;
+            for (y = 0; y < g.img_h; ++y)
+            {
+                size_t got = cupsRasterReadPixels(ras, pagebuf + y * rl, rl);
+                if (got != rl)
+                {
+                    fprintf(stderr, "rastertozjs: short row read\n");
+                    fail(ctx);
+                    fclose(out);
+                    return NULL;
+                }
+            }
+            src = pagebuf;
+            if (ctx->halftone == HT_DIFFUSION)
+            {
+                mode = HT_DIFFUSION;
+            }
+            else /* HT_AUTO */
+            {
+                unsigned long mid = 0, tot = (unsigned long)g.img_w * g.img_h;
+                for (y = 0; y < g.img_h; ++y)
+                {
+                    const unsigned char *r = pagebuf + y * rl;
+                    unsigned x;
+                    for (x = 0; x < g.img_w; ++x)
+                        if (r[x] > 0 && r[x] < 255)
+                            ++mid;
+                }
+                if (mid > (unsigned long)(tot * HT_MID_RATIO))
+                    mode = HT_DIFFUSION;
+            }
+            if (mode == HT_DIFFUSION)
+            {
+                int *n1 = realloc(err_cur, g.img_w * sizeof(int));
+                int *n2 = realloc(err_next, g.img_w * sizeof(int));
+                if (!n1 || !n2)
+                {
+                    fprintf(stderr, "rastertozjs: out of memory (errors)\n");
+                    fail(ctx);
+                    fclose(out);
+                    return NULL;
+                }
+                err_cur = n1;
+                err_next = n2;
+            }
+            if (getenv("RAS2ZJS_DEBUG"))
+                fprintf(stderr, "rastertozjs: page halftone mode=%s\n",
+                        mode == HT_DIFFUSION ? "diffusion" : "threshold");
+        }
+
         fprintf(out, "P4\n%u %u\n", g.full_w, g.full_h);
         if (ctx->dump)
             fprintf(ctx->dump, "P4\n%u %u\n", g.full_w, g.full_h);
+
         for (y = 0; y < g.full_h; ++y)
         {
-            if (g.pad && (y < g.off_y || y >= g.off_y + g.img_h))
-            {
-                memset(fullrow, 0, fullbpl);
-            }
+            unsigned row = y - (g.pad ? g.off_y : 0);
+            const unsigned char *cursrc;
+
+            if (src)
+                cursrc = (g.pad && (y < g.off_y || y >= g.off_y + g.img_h))
+                             ? NULL : src + row * hdr.cupsBytesPerLine;
+            else if (g.pad && (y < g.off_y || y >= g.off_y + g.img_h))
+                cursrc = NULL;
             else
             {
                 size_t got = cupsRasterReadPixels(ras, line,
@@ -306,7 +421,57 @@ static void *pbm_writer(void *arg)
                     fclose(out);
                     return NULL;
                 }
-                convert_row(line, pbmrow, g.img_w, rowbpl, &hdr);
+                cursrc = line;
+            }
+
+            if (!cursrc)
+            {
+                memset(fullrow, 0, fullbpl);
+            }
+            else
+            {
+                if (mode == HT_DIFFUSION)
+                {
+                    int invert = (hdr.cupsColorSpace == CUPS_CSPACE_W ||
+                                  hdr.cupsColorSpace == CUPS_CSPACE_SW);
+                    unsigned x;
+                    memset(pbmrow, 0, rowbpl);
+                    if (invert)
+                    {
+                        for (x = 0; x < g.img_w; ++x)
+                        {
+                            int v = 255 - cursrc[x] + err_cur[x];
+                            int e;
+                            if (v >= 128)
+                            {
+                                pbmrow[x / 8] |= 0x80 >> (x & 7);
+                                e = v - 255;
+                            }
+                            else
+                                e = v;
+                            if (e > 255) e = 255;
+                            else if (e < -255) e = -255;
+                            if (x + 1 < g.img_w) err_cur[x + 1] += e * 7 / 16;
+                            if (x > 0) err_next[x - 1] += e * 3 / 16;
+                            err_next[x] += e * 5 / 16;
+                            if (x + 1 < g.img_w) err_next[x + 1] += e * 1 / 16;
+                        }
+                    }
+                    else
+                    {
+                        row_diffuse(cursrc, pbmrow, g.img_w,
+                                    err_cur, err_next);
+                    }
+                    {
+                        int *t = err_cur;
+                        err_cur = err_next;
+                        err_next = t;
+                    }
+                    memset(err_next, 0, g.img_w * sizeof(int));
+                }
+                else
+                    convert_row(cursrc, pbmrow, g.img_w, rowbpl, &hdr);
+
                 if (!g.pad)
                 {
                     if (fwrite(pbmrow, 1, rowbpl, out) != rowbpl)
@@ -356,6 +521,9 @@ static void *pbm_writer(void *arg)
     free(line);
     free(pbmrow);
     free(fullrow);
+    free(pagebuf);
+    free(err_cur);
+    free(err_next);
     cupsRasterClose(ras);
     return NULL;
 }
@@ -409,6 +577,7 @@ static void parse_options(const char *options, job_opts_t *opts)
     opts->econo = 0;
     opts->jamrecovery = 0;
     opts->ret = 1;
+    opts->halftone = HT_AUTO;
     opts->copies = 1;
 
     if (!options || !*options)
@@ -437,6 +606,15 @@ static void parse_options(const char *options, job_opts_t *opts)
                 opts->duplex = 5;       /* manual, short edge */
             else
                 opts->duplex = 0;
+        }
+        else if (strcasecmp(tok, "Halftone") == 0)
+        {
+            if (strcasecmp(eq + 1, "Diffusion") == 0)
+                opts->halftone = HT_DIFFUSION;
+            else if (strcasecmp(eq + 1, "Threshold") == 0)
+                opts->halftone = HT_THRESHOLD;
+            else
+                opts->halftone = HT_AUTO;
         }
         else if (strcasecmp(tok, "EconoMode") == 0)
             opts->econo = (strcasecmp(eq + 1, "True") == 0 ||
@@ -488,6 +666,7 @@ int main(int argc, char **argv)
         opts.copies = copies;
 
     memset(&ctx, 0, sizeof(ctx));
+    ctx.halftone = opts.halftone;
     pthread_mutex_init(&ctx.mutex, NULL);
     pthread_cond_init(&ctx.cond, NULL);
 
