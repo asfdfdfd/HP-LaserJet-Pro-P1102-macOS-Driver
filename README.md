@@ -91,6 +91,9 @@ XML endpoints (no HTML pages).
 The PPD also declares the CUPS commands `ReportLevels` and `ReportStatus`,
 so System Settings → Printers & Scanners shows the toner level for the
 queue (the `commandtozjs` filter answers, same as HP's `commandToHPZJS`).
+Note for driver developers: CUPS feeds the command document to the filter
+as the optional argv[6] file argument (stdin is empty) and parses
+`ATTR:`/`STATE:` lines from the filter's *stderr* (the job status pipe).
 
 ## About the "printer drivers are deprecated" warning
 
