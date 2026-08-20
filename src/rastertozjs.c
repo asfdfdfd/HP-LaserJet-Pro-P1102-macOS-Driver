@@ -34,7 +34,10 @@ typedef struct {
     const char *media_source; /* "Auto", ... */
     int  draft;               /* Quality=draft */
     int  density;             /* 0 = not set */
-    int  duplex;              /* 0=off, 4=manual long edge, 5=manual short edge */
+    int  duplex;              /* 0=off, 4=DuplexNoTumble (long edge, backs
+                                 rotated 180), 5=DuplexTumble (short edge).
+                                 Engine codes are DMDUPLEX_MANUALLONG/
+                                 MANUALSHORT and match this mapping. */
     int  econo;               /* EconoMode (save toner) */
     int  jamrecovery;         /* JamRecovery PJL */
     int  ret;                 /* REt (resolution enhancement), default on */
@@ -55,6 +58,9 @@ typedef struct {
     unsigned        res_x;    /* HWResolution from raster header */
     unsigned        res_y;
     int             halftone; /* HT_AUTO / HT_THRESHOLD / HT_DIFFUSION */
+    int             rduplex;  /* raster header Duplex flag (first page) */
+    int             rtumble;  /* raster header Tumble flag (first page) */
+    int             pages;    /* number of pages seen (writer thread) */
 } ctx_t;
 
 static void publish_header(ctx_t *ctx, const cups_page_header2_t *hdr)
@@ -64,6 +70,8 @@ static void publish_header(ctx_t *ctx, const cups_page_header2_t *hdr)
     ctx->height = hdr->cupsHeight;
     ctx->res_x  = hdr->HWResolution[0];
     ctx->res_y  = hdr->HWResolution[1];
+    ctx->rduplex = hdr->Duplex;
+    ctx->rtumble = hdr->Tumble;
     ctx->ready  = 1;
     pthread_cond_signal(&ctx->cond);
     pthread_mutex_unlock(&ctx->mutex);
@@ -301,6 +309,9 @@ static void *pbm_writer(void *arg)
             publish_header(ctx, &hdr);
             first = 0;
         }
+        pthread_mutex_lock(&ctx->mutex);
+        ++ctx->pages;
+        pthread_mutex_unlock(&ctx->mutex);
 
         if (g.img_w == 0 || g.img_h == 0)
             continue;
@@ -525,6 +536,7 @@ static void *pbm_writer(void *arg)
     free(err_cur);
     free(err_next);
     cupsRasterClose(ras);
+    fprintf(stderr, "rastertozjs: pages=%d\n", ctx->pages);
     return NULL;
 }
 
@@ -600,10 +612,13 @@ static void parse_options(const char *options, job_opts_t *opts)
             opts->media_source = eq + 1;
         else if (strcasecmp(tok, "Duplex") == 0)
         {
-            if (strcasecmp(eq + 1, "DuplexTumble") == 0)
-                opts->duplex = 4;       /* manual, long edge */
-            else if (strcasecmp(eq + 1, "DuplexNoTumble") == 0)
-                opts->duplex = 5;       /* manual, short edge */
+            /* ZJS engine semantics (verified on the P1606dn duplexer):
+             * LONG edge = backs rotated 180 degrees (DMDUPLEX_MANUALLONG),
+             * SHORT edge = backs unrotated (DMDUPLEX_MANUALSHORT). */
+            if (strcasecmp(eq + 1, "DuplexNoTumble") == 0)
+                opts->duplex = 4;       /* long edge: backs rotated 180 */
+            else if (strcasecmp(eq + 1, "DuplexTumble") == 0)
+                opts->duplex = 5;       /* short edge: backs unrotated */
             else
                 opts->duplex = 0;
         }
@@ -662,8 +677,16 @@ int main(int argc, char **argv)
     copies = atoi(argv[4]);
     options = argv[5];
     parse_options(options, &opts);
-    if (copies > 1)
-        opts.copies = copies;
+    /* Copies are handled by CUPS/macOS (PPD: *cupsManualCopies: False):
+     * the raster already contains one page per copy (collated), so the
+     * engine must always print each page once.  Sending -n > 1 here
+     * doubles the copies (observed: 2x sheets). */
+    opts.copies = 1;
+
+    /* Job summary on stderr: visible in /var/log/cups/error_log when
+     * debug logging is enabled (cupsctl --debug-logging). */
+    fprintf(stderr, "rastertozjs: job copies=%d options=%s\n", copies,
+            options ? options : "");
 
     memset(&ctx, 0, sizeof(ctx));
     ctx.halftone = opts.halftone;
@@ -690,6 +713,18 @@ int main(int argc, char **argv)
         fprintf(stderr, "rastertozjs: failed to read CUPS raster input\n");
         return 1;
     }
+
+    /* The raster header is the canonical way CUPS tells filters about
+     * duplex: some print pipelines pass the PPD Duplex choice only in
+     * the header (hdr->Duplex / hdr->Tumble) and not in argv[5].
+     * Prefer the argv choice when present, fall back to the header.
+     * Tumble=0 is DuplexNoTumble (long edge) -> 4, Tumble=1 is
+     * DuplexTumble (short edge) -> 5. */
+    if (opts.duplex == 0 && ctx.rduplex)
+        opts.duplex = ctx.rtumble ? 5 : 4;
+
+    fprintf(stderr, "rastertozjs: duplex=%d header(Duplex=%d Tumble=%d)\n",
+            opts.duplex, ctx.rduplex, ctx.rtumble);
 
     resx = ctx.res_x ? ctx.res_x : 600;
     resy = ctx.res_y ? ctx.res_y : 600;

@@ -109,6 +109,14 @@ jbverify = executable('jbverify',
   include_directories: include_directories('src/zjs/vendor'),
   build_by_default: false)
 
+# Decodes every page of a ZjStream into P4 and prints the page sequence
+# (order, DMDUPLEX/DMCOPIES items, pause position, black-pixel bbox).
+zjsdump = executable('zjsdump',
+  'tests/zjsdump.c',
+  'src/zjs/vendor/jbig.c', 'src/zjs/vendor/jbig_ar.c',
+  include_directories: include_directories('src/zjs/vendor'),
+  build_by_default: false)
+
 # ---------------------------------------------------------------------------
 # Tests
 # ---------------------------------------------------------------------------
@@ -142,14 +150,14 @@ test('byte-identity-duplex-longedge', python3,
   args: [check, 'duplex2',
          '--filter', rastertozjs, '--refmain', refmain, '--mkraster', mkraster,
          '--pbm', 'two.pbm',
-         '--opts', 'Duplex=DuplexTumble',
+         '--opts', 'Duplex=DuplexNoTumble',
          '--refargs', '-z2 -P -L0 -d4 -r600x600 -g5100x6600 -p1 -m1 -s7 -n1'])
 
 test('byte-identity-duplex-shortedge', python3,
   args: [check, 'duplex3',
          '--filter', rastertozjs, '--refmain', refmain, '--mkraster', mkraster,
          '--pbm', 'two.pbm',
-         '--opts', 'Duplex=DuplexNoTumble',
+         '--opts', 'Duplex=DuplexTumble',
          '--refargs', '-z2 -P -L0 -d5 -r600x600 -g5100x6600 -p1 -m1 -s7 -n1'])
 
 test('byte-identity-gray-w8', python3,
@@ -197,16 +205,37 @@ test('duplex-odd', python3,
   args: [check, 'duplexodd',
          '--filter', rastertozjs, '--refmain', refmain, '--mkraster', mkraster,
          '--pbm', 'three.pbm',
-         '--opts', 'Duplex=DuplexTumble',
+         '--opts', 'Duplex=DuplexNoTumble',
          '--refargs', '-z2 -P -L0 -d4 -r600x600 -g5100x6600 -p1 -m1 -s7 -n1'])
 
-# Printer-side copies via ZJI_DMCOPIES.
-test('copies', python3,
+# Copies are handled by CUPS (PPD: *cupsManualCopies: False): the raster
+# already contains one page per copy, so the filter must NOT send -n > 1.
+# Passing copies=3 must yield the same stream as a single copy.
+test('copies-ignored', python3,
   args: [check, 'copies3',
          '--filter', rastertozjs, '--refmain', refmain, '--mkraster', mkraster,
          '--pbm', 'test600.pbm',
          '--copies', '3',
-         '--refargs', '-z2 -P -L0 -r600x600 -g5100x6600 -p1 -m1 -s7 -n3'])
+         '--refargs', '-z2 -P -L0 -r600x600 -g5100x6600 -p1 -m1 -s7 -n1'])
+
+# Manual duplex semantics (ZJS engine convention, verified on the
+# P1606dn duplexer): odd pages in order, pause, even pages in reverse
+# order; DuplexNoTumble (long edge) rotates the backs 180 degrees,
+# DuplexTumble (short edge) does not.  Copies are handled by CUPS, so
+# every page is printed once.
+# (The byte-identity tests above cannot catch an ordering/rotation bug
+# because the reference engine shares the same logic.)
+check_duplex = files('tests/check_duplex.py')
+
+test('duplex-order-longedge', python3,
+  args: [check_duplex,
+         '--filter', rastertozjs, '--mkraster', mkraster, '--zjsdump', zjsdump,
+         '--opts', 'Duplex=DuplexNoTumble', '--copies', '2', '--rotate'])
+
+test('duplex-order-shortedge', python3,
+  args: [check_duplex,
+         '--filter', rastertozjs, '--mkraster', mkraster, '--zjsdump', zjsdump,
+         '--opts', 'Duplex=DuplexTumble', '--copies', '1'])
 
 # Self-test page: the Bayer gray blocks must be visibly distinct.
 test('selftest-blocks', python3,

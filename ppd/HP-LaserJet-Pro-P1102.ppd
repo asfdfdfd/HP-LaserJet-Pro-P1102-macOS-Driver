@@ -25,7 +25,8 @@
 *cupsMarkerName black/Black: ""
 *cupsVersion: 2.4
 *cupsModelNumber: 2
-*cupsManualCopies: True
+*cupsManualCopies: False
+*cupsIPPReason ManualDuplex/M: "Manual Duplex: without changing the orientation, remove the paper stack from the output bin and place it back in the input tray printed side down. Do not discard blank sheets. Then press the printer button to continue."
 *cupsCommands: "ReportLevels ReportStatus PrintSelfTestPage"
 *cupsFilter: "application/vnd.cups-raster 100 /Library/Printers/HP/p1102raster.bundle/Contents/MacOS/rastertozjs"
 *cupsFilter: "application/vnd.cups-command 100 /Library/Printers/HP/p1102raster.bundle/Contents/MacOS/commandtozjs"
@@ -175,8 +176,8 @@
 *OrderDependency: 20 AnySetup *Duplex
 *DefaultDuplex: None
 *Duplex None/Off: ""
-*Duplex DuplexTumble/On (Flip on Long Edge): ""
-*Duplex DuplexNoTumble/On (Flip on Short Edge): ""
+*Duplex DuplexNoTumble/On (Flip on Long Edge): ""
+*Duplex DuplexTumble/On (Flip on Short Edge): ""
 *CloseUI: *Duplex
 *OpenUI *PrintDensity/Print Density: PickOne
 *OrderDependency: 10 AnySetup *PrintDensity

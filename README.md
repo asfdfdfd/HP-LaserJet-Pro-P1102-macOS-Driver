@@ -30,9 +30,18 @@ verified by the test suite.
 - Letter / A4 / A5 / A6 / B5 / Executive / Legal / envelopes / postcard / 16K
 - Media types (envelope, letterhead, transparency, labels, ...)
 - Manual feed, draft mode, print density
-- Two-sided printing (manual duplex): odd pages print, the printer pauses
-  for you to flip the paper, then even pages print flipped
-- Multiple copies (printer-side)
+- Two-sided printing (manual duplex): odd pages print, the printer
+  pauses, then even pages print in reverse order.  Follow HP's
+  documented procedure: take the stack out of the output bin and place
+  it back into the input tray **without flipping it** — printed side
+  down, same orientation, top edge feeding first (the P1102 has no
+  duplexer; the official HP driver works the same way).
+  "Flip on Long Edge" (DuplexNoTumble, recommended) prints the backs
+  rotated 180 degrees: read the back of a sheet by turning it over the
+  **top** edge.  "Flip on Short Edge" (DuplexTumble) leaves the backs
+  unrotated: reinsert the stack rotated 180 degrees in the plane, then
+  read the back over the top edge.  (Copies are handled by CUPS and
+  come out collated.)
 - Printer status, toner level, page counters and estimated pages remaining
   via `p1102status` (EWS HTTP over USB, the same mechanism HP's own
   `usbink` uses)
